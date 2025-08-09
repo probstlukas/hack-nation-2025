@@ -150,7 +150,7 @@ const Dashboard: React.FC = () => {
         
         <div className="grid md:grid-cols-3 gap-8 mb-12">
           {/* Stage 1: Document Q&A */}
-          <div className="card">
+          <div className="card fade-in hover-lift">
             <div className="card-body text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileText className="text-blue-600" size={32} />
@@ -164,7 +164,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Stage 2: Financial Forecasting */}
-          <div className="card">
+          <div className="card fade-in hover-lift" style={{animationDelay: '0.1s'}}>
             <div className="card-body text-center">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <TrendingUp className="text-orange-600" size={32} />
@@ -178,7 +178,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Stage 3: Investment Strategy */}
-          <div className="card">
+          <div className="card fade-in hover-lift" style={{animationDelay: '0.2s'}}>
             <div className="card-body text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="text-green-600" size={32} />
@@ -204,15 +204,15 @@ const Dashboard: React.FC = () => {
           {/* Search and Cascading Filters */}
           <div className="grid md:grid-cols-4 gap-4 mb-6">
             <div className="md:col-span-1 col-span-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <div className="input-group">
                 <input
                   type="text"
                   placeholder="Search by company or document name..."
-                  className="form-input pl-10"
+                  className="form-input"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                <Search className="input-icon" size={18} />
               </div>
             </div>
 

@@ -50,7 +50,7 @@ echo "🔧 Starting services..."
 
 # Start FastAPI backend in background
 echo "🚀 Starting FastAPI backend on http://localhost:5001"
-python app.py &
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 5001 --reload &
 BACKEND_PID=$!
 
 # Wait a moment for backend to start

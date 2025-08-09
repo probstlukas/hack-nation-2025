@@ -33,7 +33,7 @@ export const apiService = {
   // Document operations
   async getDocuments(): Promise<Document[]> {
     const response = await api.get<ApiResponse<{ documents: Document[]; total: number }>>(
-      '/api/documents'
+      '/api/documents?limit=1000'
     );
     return response.data.data?.documents || [];
   },
@@ -66,6 +66,26 @@ export const apiService = {
       throw new Error(response.data.error || 'Failed to fetch sentiment analysis');
     }
     return response.data.data.sentiment;
+  },
+
+  async getEnhancedDocumentSentiment(documentId: string, includeNews: boolean = true): Promise<any> {
+    const response = await api.get<ApiResponse<any>>(
+      `/api/documents/${documentId}/enhanced-sentiment?include_news=${includeNews}`
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch enhanced sentiment analysis');
+    }
+    return response.data.data;
+  },
+
+  async getCompanyNewsSentiment(companyName: string, daysBack: number = 30): Promise<any> {
+    const response = await api.get<ApiResponse<any>>(
+      `/api/companies/${encodeURIComponent(companyName)}/news-sentiment?days_back=${daysBack}`
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch news sentiment');
+    }
+    return response.data.data.news_sentiment;
   },
 
   // Q&A operations

@@ -1,149 +1,113 @@
-import React from 'react';
-import { TrendingUp, BarChart3, Calendar, Target, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, Search, LineChart as LineChartIcon, Loader2 } from 'lucide-react';
+import { apiService } from '../services/api';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+
+const periods = [
+  { label: '1y', value: '1y' },
+  { label: '2y', value: '2y' },
+  { label: '5y', value: '5y' },
+  { label: '10y', value: '10y' },
+  { label: 'Max', value: 'max' },
+];
 
 const Forecasting: React.FC = () => {
+  const [ticker, setTicker] = useState('AAPL');
+  const [period, setPeriod] = useState('5y');
+  const [horizon, setHorizon] = useState(5);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<any | null>(null);
+
+  const runForecast = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!ticker.trim()) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await apiService.createForecast({ ticker: ticker.trim().toUpperCase(), period, forecast_periods: horizon as any, metrics: [] } as any);
+      // api returns { success, data }
+      if (!data.success) throw new Error(data.error || 'Forecast failed');
+      setResult(data.data);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to run forecast');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-        <div className="container mx-auto px-6 py-16">
-          <div className="text-center">
-            <TrendingUp size={64} className="mx-auto mb-4" />
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Financial Forecasting
-            </h1>
-            <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
-              Stage 2: Predict future financial outcomes based on historical data and market trends
-            </p>
-            <div className="inline-flex items-center gap-2 bg-orange-400 text-orange-900 px-4 py-2 rounded-full font-semibold">
-              <Calendar size={20} />
-              Coming Soon
-            </div>
+      {/* Hero */}
+      <div className="bg-white/60 backdrop-blur border-b border-white/60">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center gap-3">
+            <TrendingUp size={28} className="text-blue-600" />
+            <h1 className="text-2xl font-bold">Financial Forecasting</h1>
           </div>
+          <p className="text-sm text-slate-600 mt-2">Predict near‑term price levels using a lightweight RandomForest model trained on engineered features (returns, moving averages, volatility) from Yahoo Finance.</p>
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-12">
-        {/* Features Preview */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+      <div className="container mx-auto px-6 py-8">
+        {/* Controls */}
+        <form onSubmit={runForecast} className="card mb-6">
+          <div className="card-body">
+            <div className="grid md:grid-cols-4 gap-4">
+              <div>
+                <label className="form-label">Ticker</label>
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input className="form-input pl-9" placeholder="AAPL, NVDA, MSFT" value={ticker} onChange={(e)=>setTicker(e.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Period</label>
+                <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
+                  {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Horizon (days)</label>
+                <input className="form-input" type="number" min={1} max={30} value={horizon} onChange={(e)=>setHorizon(parseInt(e.target.value||'5'))} />
+              </div>
+
+              <div className="flex items-end">
+                <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin" size={16} /> : <LineChartIcon size={16} />}
+                  Run Forecast
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        {error && (
+          <div className="alert alert-danger mb-6">{error}</div>
+        )}
+
+        {/* Results */}
+        {result && (
           <div className="card">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BarChart3 className="text-blue-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Predict Financial Trends</h3>
-              <p className="text-gray-600">
-                Forecast stock prices, earnings growth, and market performance using advanced AI models.
-              </p>
+            <div className="card-header flex items-center justify-between">
+              <h3 className="font-semibold">{result.ticker} • {result.model} • MAE: {result.mae.toFixed(2)}</h3>
+              <div className="text-sm text-slate-600">Last price: ${result.last_price.toFixed(2)}</div>
+            </div>
+            <div className="card-body" style={{height: 380}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={result.predictions} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="pred" stroke="#2563eb" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
-
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="text-green-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">External Data Integration</h3>
-              <p className="text-gray-600">
-                Enhance predictions with data from Yahoo Finance API, Quandl, and Alpha Vantage.
-              </p>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="text-purple-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Forecasting Models</h3>
-              <p className="text-gray-600">
-                Build sophisticated models to predict stock movements, earnings, and market risks.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Planned Features */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <h2 className="text-3xl font-bold text-center mb-8">Planned Features</h2>
-          
-          <div className="space-y-6">
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-orange-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Time Series Forecasting</h4>
-                <p className="text-gray-600">
-                  Use historical financial data to predict future trends with LSTM, ARIMA, and other time series models.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-orange-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Multi-Asset Correlation Analysis</h4>
-                <p className="text-gray-600">
-                  Analyze relationships between different financial instruments and market sectors.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-orange-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Risk Assessment Models</h4>
-                <p className="text-gray-600">
-                  Calculate Value at Risk (VaR), volatility forecasts, and scenario analysis.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-orange-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">External Data Integration</h4>
-                <p className="text-gray-600">
-                  Connect with Yahoo Finance, Quandl, and Alpha Vantage APIs for real-time market data.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-orange-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Interactive Forecasting Dashboard</h4>
-                <p className="text-gray-600">
-                  Visualize predictions with interactive charts, confidence intervals, and scenario modeling.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Call to Action */}
-        <div className="text-center mt-12">
-          <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-8 border border-orange-200">
-            <h3 className="text-2xl font-bold mb-4">Stay Tuned for Stage 2!</h3>
-            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-              We're working hard to bring you advanced financial forecasting capabilities. 
-              This stage will integrate historical data analysis with machine learning to predict future market trends.
-            </p>
-            <div className="inline-flex items-center gap-2 text-orange-600 font-semibold">
-              <TrendingUp size={20} />
-              Expected Release: Next Phase of Development
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

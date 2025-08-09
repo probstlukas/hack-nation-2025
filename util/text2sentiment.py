@@ -1,11 +1,16 @@
 from dataclasses import dataclass
 from typing import Dict, List, Literal
-from transformers import pipeline
-from textblob import TextBlob
-import nltk
 import os
+import nltk
 
-_sentiment_classifier = pipeline("sentiment-analysis")
+# Optional transformers sentiment pipeline
+try:
+    from transformers import pipeline  # type: ignore
+    _sentiment_classifier = pipeline("sentiment-analysis")
+except Exception:
+    _sentiment_classifier = None  # Fallback if transformers/torch not installed
+
+from textblob import TextBlob
 
 
 def setup_nltk_data():
@@ -62,18 +67,40 @@ class SentimentSummary:
 
 
 def text2sentiment(text_list: List[str]) -> List[SentimentSummary]:
-    results = []
+    results: List[SentimentSummary] = []
     for text in text_list:
-        # Hugging Face sentiment (list of dicts, get first)
-        sentiment_deep: List[Dict] = _sentiment_classifier(text)
-        hf_result = sentiment_deep[0]
-        hf_label = hf_result["label"]
-        hf_score = hf_result["score"]
+        text = (text or "").strip()
+        if not text:
+            results.append(
+                SentimentSummary(
+                    textblob_polarity=0.0,
+                    textblob_subjectivity=0.0,
+                    huggingface_label="NEUTRAL",
+                    huggingface_score=0.0,
+                )
+            )
+            continue
 
         # TextBlob sentiment
         sentiment_classical = TextBlob(text).sentiment
-        polarity: float = sentiment_classical.polarity
-        subjectivity: float = sentiment_classical.subjectivity
+        polarity: float = float(sentiment_classical.polarity)
+        subjectivity: float = float(sentiment_classical.subjectivity)
+
+        # Hugging Face sentiment (optional)
+        if _sentiment_classifier is not None:
+            try:
+                sentiment_deep: List[Dict] = _sentiment_classifier(text)
+                hf_result = sentiment_deep[0]
+                hf_label = str(hf_result.get("label", "NEUTRAL")).upper()
+                hf_score = float(hf_result.get("score", 0.0))
+            except Exception:
+                # Fallback to TextBlob-only inference
+                hf_label = "POSITIVE" if polarity > 0.05 else ("NEGATIVE" if polarity < -0.05 else "NEUTRAL")
+                hf_score = min(1.0, max(0.0, abs(polarity)))
+        else:
+            # Transformers not available
+            hf_label = "POSITIVE" if polarity > 0.05 else ("NEGATIVE" if polarity < -0.05 else "NEUTRAL")
+            hf_score = min(1.0, max(0.0, abs(polarity)))
 
         # Combine into SentimentSummary
         summary = SentimentSummary(

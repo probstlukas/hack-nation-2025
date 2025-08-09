@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TrendingUp, Search, LineChart as LineChartIcon, Loader2 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
 
 const periods = [
   { label: '1y', value: '1y' },
@@ -25,8 +25,7 @@ const Forecasting: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiService.createForecast({ ticker: ticker.trim().toUpperCase(), period, forecast_periods: horizon as any, metrics: [] } as any);
-      // api returns { success, data }
+      const data = await apiService.createForecast({ ticker: ticker.trim().toUpperCase(), period, horizon } as any);
       if (!data.success) throw new Error(data.error || 'Forecast failed');
       setResult(data.data);
     } catch (err: any) {
@@ -35,6 +34,14 @@ const Forecasting: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const combinedData = React.useMemo(() => {
+    if (!result) return [] as any[];
+    const hist = (result.history || []).map((d: any) => ({ date: d.date, close: d.close }));
+    const lastDate = hist.length ? hist[hist.length - 1].date : undefined;
+    const preds = (result.predictions || []).map((d: any) => ({ date: d.date, pred: d.pred }));
+    return { hist, preds, lastDate };
+  }, [result]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,7 +52,7 @@ const Forecasting: React.FC = () => {
             <TrendingUp size={28} className="text-blue-600" />
             <h1 className="text-2xl font-bold">Financial Forecasting</h1>
           </div>
-          <p className="text-sm text-slate-600 mt-2">Predict near‑term price levels using a lightweight RandomForest model trained on engineered features (returns, moving averages, volatility) from Yahoo Finance.</p>
+          <p className="text-sm text-slate-600 mt-2">Forecast near‑term price levels and visualize them alongside recent history.</p>
         </div>
       </div>
 
@@ -95,14 +102,22 @@ const Forecasting: React.FC = () => {
               <h3 className="font-semibold">{result.ticker} • {result.model} • MAE: {result.mae.toFixed(2)}</h3>
               <div className="text-sm text-slate-600">Last price: ${result.last_price.toFixed(2)}</div>
             </div>
-            <div className="card-body" style={{height: 380}}>
+            <div className="card-body" style={{height: 420}}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={result.predictions} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                <LineChart margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} allowDuplicatedCategory={false} />
                   <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="pred" stroke="#2563eb" strokeWidth={2} dot={false} />
+                  <Legend />
+                  {/* History */}
+                  <Line dataKey="close" name="History" stroke="#0ea5e9" strokeWidth={2} dot={false} data={combinedData.hist} />
+                  {/* Separator */}
+                  {combinedData.lastDate && (
+                    <ReferenceLine x={combinedData.lastDate} stroke="#94a3b8" strokeDasharray="3 3" />
+                  )}
+                  {/* Forecast */}
+                  <Line dataKey="pred" name="Forecast" stroke="#2563eb" strokeWidth={2} dot={false} data={combinedData.preds} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

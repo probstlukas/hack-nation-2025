@@ -14,7 +14,7 @@ import { apiService } from '../services/api';
 import { Document, SentimentAnalysis } from '../types';
 
 const DocumentAnalysis: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const [document, setDocument] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,12 +34,12 @@ const DocumentAnalysis: React.FC = () => {
 
   useEffect(() => {
     const fetchDocument = async () => {
-      if (!id) return;
-      
+      if (!documentId) return;
       try {
         setLoading(true);
-        const doc = await apiService.getDocument(id);
+        const doc = await apiService.getDocument(documentId);
         setDocument(doc);
+        setError(null);
       } catch (err) {
         setError('Failed to load document');
         console.error('Error fetching document:', err);
@@ -49,7 +49,7 @@ const DocumentAnalysis: React.FC = () => {
     };
 
     fetchDocument();
-  }, [id]);
+  }, [documentId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

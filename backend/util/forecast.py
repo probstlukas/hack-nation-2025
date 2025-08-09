@@ -18,6 +18,7 @@ class ForecastResult:
     horizon_days: int
     last_price: float
     predictions: pd.DataFrame  # columns: ['date', 'pred']
+    history: pd.DataFrame      # columns: ['date', 'close']
 
 
 def load_prices(ticker: str, period: str = "5y") -> pd.DataFrame:
@@ -88,6 +89,7 @@ def run_forecast(ticker: str, period: str = "5y", horizon: int = 5) -> ForecastR
         horizon_days=horizon,
         last_price=float(prices["close"].iloc[-1]),
         predictions=pred_df,
+        history=prices.tail(252*2).copy(),  # last ~2 years for context
     )
 
 

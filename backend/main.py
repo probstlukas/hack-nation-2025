@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 import logging
 
 # Import our PDF processing utilities
-from util.pdf2text import (
+from backend.util.pdf2text import (
     load_financebench_index, 
     get_doc_metadata,
     parse_stock_and_year,
@@ -29,10 +29,10 @@ from util.pdf2text import (
     chunk_documents,
     extract_financial_metrics
 )
-from util.text2sentiment import text2sentiment, SentimentSummary
-from util.retrieval import answer_question
-from util.forecast import run_forecast
-from util.news_sentiment import analyze_company_news_sentiment, NewsSentimentResult
+from backend.util.text2sentiment import text2sentiment, SentimentSummary
+from backend.util.retrieval import answer_question
+from backend.util.forecast import run_forecast
+from backend.util.news_sentiment import analyze_company_news_sentiment, NewsSentimentResult
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -585,6 +585,7 @@ async def create_forecast(ticker: str = Query(..., min_length=1), period: str = 
             "horizon_days": result.horizon_days,
             "last_price": result.last_price,
             "predictions": result.predictions.assign(date=lambda d: d["date"].dt.strftime("%Y-%m-%d")).to_dict(orient="records"),
+            "history": result.history.assign(date=lambda d: d["date"].dt.strftime("%Y-%m-%d")).to_dict(orient="records"),
         }
         return APIResponse(success=True, data=data)
     except Exception as e:

@@ -1,0 +1,105 @@
+import axios from 'axios';
+import { 
+  Document, 
+  DocumentText, 
+  SentimentAnalysis, 
+  QARequest, 
+  QAResponse, 
+  ApiResponse,
+  ForecastRequest,
+  InvestmentRecommendation
+} from '../types';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 30000, // 30 seconds for Q&A operations
+});
+
+// Response interceptor to handle API responses
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+export const apiService = {
+  // Document operations
+  async getDocuments(): Promise<Document[]> {
+    const response = await api.get<ApiResponse<{ documents: Document[]; total: number }>>(
+      '/api/documents'
+    );
+    return response.data.data?.documents || [];
+  },
+
+  async getDocument(documentId: string): Promise<Document> {
+    const response = await api.get<ApiResponse<{ document: Document }>>(
+      `/api/documents/${documentId}`
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch document');
+    }
+    return response.data.data.document;
+  },
+
+  async getDocumentText(documentId: string): Promise<DocumentText> {
+    const response = await api.get<ApiResponse<DocumentText>>(
+      `/api/documents/${documentId}/text`
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch document text');
+    }
+    return response.data.data;
+  },
+
+  async getDocumentSentiment(documentId: string): Promise<SentimentAnalysis> {
+    const response = await api.get<ApiResponse<{ sentiment: SentimentAnalysis }>>(
+      `/api/documents/${documentId}/sentiment`
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch sentiment analysis');
+    }
+    return response.data.data.sentiment;
+  },
+
+  // Q&A operations
+  async askQuestion(request: QARequest): Promise<QAResponse> {
+    const response = await api.post<ApiResponse<QAResponse>>('/api/qa', request);
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to get answer');
+    }
+    return response.data.data;
+  },
+
+  // Stage 2: Financial Forecasting (placeholders)
+  async createForecast(request: ForecastRequest): Promise<any> {
+    const response = await api.post<ApiResponse<any>>('/api/forecast', request);
+    return response.data;
+  },
+
+  // Stage 3: Investment Strategy (placeholders)
+  async getInvestmentRecommendation(documentId: string): Promise<InvestmentRecommendation> {
+    const response = await api.post<ApiResponse<InvestmentRecommendation>>(
+      '/api/investment-recommendation',
+      { document_id: documentId }
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to get investment recommendation');
+    }
+    return response.data.data;
+  },
+
+  // Health check
+  async healthCheck(): Promise<any> {
+    const response = await api.get('/');
+    return response.data;
+  },
+};
+
+export default apiService;

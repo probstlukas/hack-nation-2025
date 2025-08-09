@@ -1,0 +1,1 @@
+textblob (basic sentiment analysis) language corpus for sentiment lookup

@@ -1,10 +1,9 @@
 import os
 import openai
 import chromadb
-from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from tqdm import tqdm
-from util.pdf_text_extraction import parse_pdf_with_nice_tables
+from .pdf_text_extraction import parse_pdf_with_nice_tables
 
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -44,6 +43,7 @@ def create_chroma_vector_db(
     client = chromadb.PersistentClient(path=persist_directory)
 
     existing_collections = [col.name for col in client.list_collections()]
+    print("Found vectordbs:", existing_collections)
     if collection_name in existing_collections:
         print(f"Search for existing vectordb '{collection_name}'")
         collection = client.get_collection(collection_name)

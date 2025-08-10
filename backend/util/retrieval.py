@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import List, Tuple, Dict, Any
 import math
 
@@ -8,6 +9,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .pdf2text import chunk_documents
+from .answer_question import answer_question_openai
 
 
 @dataclass
@@ -56,6 +58,8 @@ def answer_question(doc_id: str, question: str, top_k: int = 4) -> Dict[str, Any
 
     This is a lightweight baseline to replace rule-based responses.
     """
+
+    """
     hits = retrieve(doc_id, question, top_k=top_k)
     if not hits:
         return {
@@ -78,7 +82,19 @@ def answer_question(doc_id: str, question: str, top_k: int = 4) -> Dict[str, Any
     avg_score = sum(scores) / max(1, len(scores))
     # map cosine [0..1] to rough confidence [0.6..0.95]
     confidence = 0.6 + 0.35 * max(0.0, min(1.0, avg_score))
+    """
 
+    doc_index = {
+        name.lower(): name for name in os.listdir("datasets/financebench/pdfs")
+    }
+    doc_name = doc_index[doc_id.lower() + ".pdf"]
+    doc_path = os.path.join("datasets", "financebench", "pdfs", doc_name)
+    print("Before answer question")
+    answer = answer_question_openai(question, doc_path, top_k)
+    print("after answer question")
+    print(answer)
+    sources = []
+    confidence = 0.74
     return {
         "answer": answer,
         "sources": sources,

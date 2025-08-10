@@ -750,23 +750,88 @@ textarea.form-input {
   background: rgba(37, 99, 235, 0.5);
 }
 
-/* Responsive */
-@media (min-width: 768px) {
-  .md\:grid-cols-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* ---- Lightweight utility layer to support Tailwind-like classes used in JSX ---- */
+/* Layout */
+.min-h-screen { min-height: 100vh; }
+.min-h-0 { min-height: 0; }
+.flex-1 { flex: 1 1 0%; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.overflow-y-auto { overflow-y: auto; }
+.block { display: block; }
 
-  .md\:grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
+/* Flexbox helpers */
+.justify-center { justify-content: center; }
+.justify-start { justify-content: flex-start; }
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.gap-8 { gap: 2rem; }
 
+/* Grid column spans (desktop) */
 @media (min-width: 1024px) {
-  .lg\:grid-cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .lg\:grid-cols-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+  .lg\:col-span-1 { grid-column: span 1 / span 1; }
+  .lg\:col-span-3 { grid-column: span 3 / span 3; }
 }
+
+/* Spacing */
+.p-4 { padding: 1rem; }
+.p-6 { padding: 1.5rem; }
+.p-8 { padding: 2rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.mt-20 { margin-top: 5rem; }
+.mb-4 { margin-bottom: 1rem; }
+
+/* Additional utilities for layout consistency */
+.flex-col { flex-direction: column; }
+.items-start { align-items: flex-start; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.text-left { text-align: left; }
+
+/* Shadows */
+.shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+
+/* Borders */
+.border-b-0 { border-bottom: 0; }
+
+/* More spacing helpers */
+.py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.px-8 { padding-left: 2rem; padding-right: 2rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+
+/* Size helpers */
+.h-64 { height: 16rem; }
+.w-16 { width: 4rem; }
+.h-16 { height: 4rem; }
+.min-h-24 { min-height: 6rem; }
+
+/* Grid helpers */
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Transitions */
+.transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+.duration-200 { transition-duration: 200ms; }
+
+/* Responsive min-heights */
+@media (min-width: 768px) {
+  .md\:min-h-28 { min-height: 7rem; }
+}
+
+/* Background/foreground for badges used inside sentiment/news */
+.badge-success { background: rgba(5, 150, 105, 0.1); color: #065f46; border: 1px solid rgba(5, 150, 105, 0.2); }
+.badge-danger { background: rgba(220, 38, 38, 0.1); color: #991b1b; border: 1px solid rgba(220, 38, 38, 0.2); }
+.badge-secondary { background: rgba(100, 116, 139, 0.1); color: #334155; border: 1px solid rgba(100, 116, 139, 0.2); }
+
+/* Ensure cards that should fill available space actually do */
+.full-height-card { height: calc(100vh - 220px); }
+
+/* Keep tab container from collapsing */
+.tabs { align-items: center; }
+/* ---- End utility layer ---- */

@@ -87,15 +87,25 @@ export const apiService = {
     return response.data.data;
   },
 
-  // Stage 2: Financial Forecasting
-  async createForecast(request: Partial<ForecastRequest> & { ticker?: string; period?: string; horizon?: number }): Promise<any> {
+  // Forecasting
+  async createForecast(request: Partial<ForecastRequest> & { ticker?: string; period?: string; horizon?: number; model?: string }): Promise<any> {
     const ticker = (request as any).ticker || '';
     const period = (request as any).period || '5y';
     const horizon = (request as any).horizon ?? (request as any).forecast_periods ?? 5;
+    const model = (request as any).model || 'rf';
     if (!ticker) throw new Error('ticker is required');
-    const url = `/api/forecast?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}&horizon=${encodeURIComponent(String(horizon))}`;
+    const url = `/api/forecast?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}&horizon=${encodeURIComponent(String(horizon))}&model=${encodeURIComponent(model)}`;
     const response = await api.post<ApiResponse<any>>(url);
     return response.data;
+  },
+
+  async getCompanyNewsSentiment(companyName: string, daysBack: number = 30): Promise<any> {
+    const url = `/api/companies/${encodeURIComponent(companyName)}/news-sentiment?days_back=${encodeURIComponent(String(daysBack))}`;
+    const response = await api.get<ApiResponse<any>>(url);
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch company news sentiment');
+    }
+    return response.data.data.news_sentiment;
   },
 
   // Stage 3: Investment Strategy (placeholders)

@@ -9,9 +9,9 @@ import {
   BarChart3,
   TrendingUp 
 } from 'lucide-react';
-import Navbar from '../components/Navbar';
 import { apiService } from '../services/api';
 import { Document, SentimentAnalysis } from '../types';
+import PDFViewer from '../components/PDFViewer';
 
 const DocumentAnalysis: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
@@ -126,7 +126,14 @@ const DocumentAnalysis: React.FC = () => {
       // Try enhanced sentiment first, fallback to basic sentiment
       try {
         const enhanced = await apiService.getEnhancedDocumentSentiment(document.id);
-        setSentimentData(enhanced);
+        // Normalize shape: pick document_sentiment as the SentimentAnalysis
+        const docSent = (enhanced && (enhanced.document_sentiment || enhanced.sentiment)) ?? enhanced;
+        const normalized = docSent as SentimentAnalysis;
+        // Attach news_sentiment only if it has overall_sentiment to avoid runtime errors
+        if (enhanced && enhanced.news_sentiment && enhanced.news_sentiment.overall_sentiment) {
+          (normalized as any).news_sentiment = enhanced.news_sentiment;
+        }
+        setSentimentData(normalized);
       } catch (enhancedError) {
         console.warn('Enhanced sentiment failed, trying basic sentiment:', enhancedError);
         const basic = await apiService.getDocumentSentiment(document.id);
@@ -153,12 +160,11 @@ const DocumentAnalysis: React.FC = () => {
   if (error || !document) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <div className="container mx-auto px-6 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
             <p className="text-gray-600 mb-4">{error || 'Document not found'}</p>
-            <Link to="/dashboard" className="btn btn-primary">
+            <Link to="/" className="btn btn-primary">
               <ArrowLeft size={16} />
               Back to Dashboard
             </Link>
@@ -175,8 +181,7 @@ const DocumentAnalysis: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -184,7 +189,7 @@ const DocumentAnalysis: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/')}
                 className="btn btn-outline hover-lift"
               >
                 <ArrowLeft size={16} />
@@ -203,55 +208,43 @@ const DocumentAnalysis: React.FC = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-t-xl shadow-sm border border-gray-200 border-b-0">
-          <div className="flex">
+      <div className="container mx-auto px-6 py-8 flex-1 flex flex-col min-h-0">
+        {/* Tab Navigation (consistent styling) */}
+        <div className="bg-white rounded-t-xl shadow-sm border border-gray-200 border-b-0 w-full block">
+          <div className="tabs">
             <button
               onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-3 px-8 py-4 font-medium text-base border-b-3 transition-all duration-200 hover-lift ${
-                activeTab === 'chat'
-                  ? 'border-blue-500 text-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`tab ${activeTab === 'chat' ? 'active' : ''}`}
             >
-              <MessageSquare size={20} />
-              Q&A Chat
+              <MessageSquare size={18} />
+              <span>Q&A Chat</span>
             </button>
             <button
               onClick={() => setActiveTab('document')}
-              className={`flex items-center gap-3 px-8 py-4 font-medium text-base border-b-3 transition-all duration-200 hover-lift ${
-                activeTab === 'document'
-                  ? 'border-blue-500 text-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`tab ${activeTab === 'document' ? 'active' : ''}`}
             >
-              <FileText size={20} />
-              PDF View
+              <FileText size={18} />
+              <span>PDF View</span>
             </button>
             <button
               onClick={() => {
                 setActiveTab('sentiment');
                 loadSentimentData();
               }}
-              className={`flex items-center gap-3 px-8 py-4 font-medium text-base border-b-3 transition-all duration-200 hover-lift ${
-                activeTab === 'sentiment'
-                  ? 'border-blue-500 text-blue-600 bg-gradient-to-r from-blue-50 to-indigo-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`tab ${activeTab === 'sentiment' ? 'active' : ''}`}
             >
-              <TrendingUp size={20} />
-              Sentiment Analysis
+              <TrendingUp size={18} />
+              <span>Sentiment Analysis</span>
             </button>
           </div>
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white rounded-b-xl shadow-lg border border-gray-200 min-h-[700px]">
+        <div className="bg-white rounded-b-xl shadow-lg border border-gray-200 flex-1 flex flex-col min-h-0 w-full">
           {/* Q&A Chat Tab */}
           {activeTab === 'chat' && (
-            <div className="p-8">
-              <div className="grid lg:grid-cols-4 gap-8 h-full">
+            <div className="p-8 flex-1 flex flex-col min-h-0">
+              <div className="grid lg:grid-cols-4 gap-8 flex-1 min-h-0">
                 {/* Sidebar with Quick Questions and Metrics */}
                 <div className="lg:col-span-1 space-y-6">
                   {/* Quick Questions */}
@@ -315,10 +308,10 @@ const DocumentAnalysis: React.FC = () => {
                 </div>
 
                 {/* Chat Interface */}
-                <div className="lg:col-span-3">
-                  <div className="bg-gray-50 rounded-xl border border-gray-200 h-[600px] flex flex-col">
+                <div className="lg:col-span-3 min-h-0 flex flex-col">
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 flex-1 flex flex-col min-h-[50vh]">
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll min-h-0">
                       {messages.length === 0 && (
                         <div className="text-center text-gray-500 mt-20">
                           <MessageSquare size={48} className="mx-auto mb-4 text-gray-400" />
@@ -367,8 +360,8 @@ const DocumentAnalysis: React.FC = () => {
                           onChange={(e) => setCurrentQuestion(e.target.value)}
                           onKeyPress={handleKeyPress}
                           placeholder="Ask a question about this document..."
-                          className="flex-1 form-input resize-none min-h-[44px] max-h-[120px]"
-                          rows={1}
+                          className="flex-1 form-input resize-y min-h-24 md:min-h-28 max-h-[40vh]"
+                          rows={3}
                           disabled={questionLoading}
                         />
                         <button
@@ -393,14 +386,11 @@ const DocumentAnalysis: React.FC = () => {
           {/* PDF View Tab */}
           {activeTab === 'document' && (
             <div className="p-8">
-              <div className="bg-gray-50 rounded-xl border border-gray-200 h-[800px]">
+              <div className="card full-height-card flex flex-col overflow-hidden">
                 {document ? (
-                  <iframe
-                    title="PDF Document"
-                    src={`http://localhost:5001/api/documents/${document.id}/pdf#view=FitH&zoom=page-width`}
-                    className="w-full h-full rounded-xl"
-                    loading="eager"
-                    allow="fullscreen"
+                  <PDFViewer
+                    pdfUrl={`http://localhost:5001/api/documents/${document.id}/pdf`}
+                    documentName={document.name}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">
@@ -424,7 +414,7 @@ const DocumentAnalysis: React.FC = () => {
                     <span className="text-lg">Analyzing document sentiment...</span>
                   </div>
                 </div>
-              ) : sentimentData ? (
+              ) : sentimentData && sentimentData.overall ? (
                 <div className="space-y-6">
                   {/* Overall Sentiment */}
                   <div className="card">
@@ -435,19 +425,19 @@ const DocumentAnalysis: React.FC = () => {
                       <div className="grid md:grid-cols-3 gap-4">
                         <div className="text-center p-4 bg-green-50 rounded-lg">
                           <div className="text-2xl font-bold text-green-600">
-                            {(sentimentData.overall.positive * 100).toFixed(1)}%
+                            {((sentimentData.overall?.positive ?? 0) * 100).toFixed(1)}%
                           </div>
                           <div className="text-sm text-green-700 font-medium">Positive</div>
                         </div>
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
                           <div className="text-2xl font-bold text-gray-600">
-                            {(sentimentData.overall.neutral * 100).toFixed(1)}%
+                            {((sentimentData.overall?.neutral ?? 0) * 100).toFixed(1)}%
                           </div>
                           <div className="text-sm text-gray-700 font-medium">Neutral</div>
                         </div>
                         <div className="text-center p-4 bg-red-50 rounded-lg">
                           <div className="text-2xl font-bold text-red-600">
-                            {(sentimentData.overall.negative * 100).toFixed(1)}%
+                            {((sentimentData.overall?.negative ?? 0) * 100).toFixed(1)}%
                           </div>
                           <div className="text-sm text-red-700 font-medium">Negative</div>
                         </div>
@@ -469,19 +459,19 @@ const DocumentAnalysis: React.FC = () => {
                               <div className="grid grid-cols-3 gap-3 text-sm">
                                 <div className="text-center">
                                   <div className="font-semibold text-green-600">
-                                    {(sentiment.positive * 100).toFixed(1)}%
+                                    {(((sentiment?.positive ?? 0) as number) * 100).toFixed(1)}%
                                   </div>
                                   <div className="text-gray-600">Positive</div>
                                 </div>
                                 <div className="text-center">
                                   <div className="font-semibold text-gray-600">
-                                    {(sentiment.neutral * 100).toFixed(1)}%
+                                    {(((sentiment?.neutral ?? 0) as number) * 100).toFixed(1)}%
                                   </div>
                                   <div className="text-gray-600">Neutral</div>
                                 </div>
                                 <div className="text-center">
                                   <div className="font-semibold text-red-600">
-                                    {(sentiment.negative * 100).toFixed(1)}%
+                                    {(((sentiment?.negative ?? 0) as number) * 100).toFixed(1)}%
                                   </div>
                                   <div className="text-gray-600">Negative</div>
                                 </div>
@@ -494,7 +484,7 @@ const DocumentAnalysis: React.FC = () => {
                   )}
 
                   {/* News Sentiment */}
-                  {(sentimentData as any).news_sentiment && (
+                  {(sentimentData as any).news_sentiment && (sentimentData as any).news_sentiment.overall_sentiment && (
                     <div className="card">
                       <div className="card-header">
                         <h3 className="text-xl font-semibold">Recent News Sentiment</h3>
@@ -504,19 +494,19 @@ const DocumentAnalysis: React.FC = () => {
                         <div className="grid md:grid-cols-3 gap-4 mb-6">
                           <div className="text-center p-4 bg-green-50 rounded-lg">
                             <div className="text-xl font-bold text-green-600">
-                              {((sentimentData as any).news_sentiment.overall_sentiment.positive * 100).toFixed(1)}%
+                              {(((sentimentData as any).news_sentiment.overall_sentiment.positive ?? 0) * 100).toFixed(1)}%
                             </div>
                             <div className="text-sm text-green-700 font-medium">Positive</div>
                           </div>
                           <div className="text-center p-4 bg-gray-50 rounded-lg">
                             <div className="text-xl font-bold text-gray-600">
-                              {((sentimentData as any).news_sentiment.overall_sentiment.neutral * 100).toFixed(1)}%
+                              {(((sentimentData as any).news_sentiment.overall_sentiment.neutral ?? 0) * 100).toFixed(1)}%
                             </div>
                             <div className="text-sm text-gray-700 font-medium">Neutral</div>
                           </div>
                           <div className="text-center p-4 bg-red-50 rounded-lg">
                             <div className="text-xl font-bold text-red-600">
-                              {((sentimentData as any).news_sentiment.overall_sentiment.negative * 100).toFixed(1)}%
+                              {(((sentimentData as any).news_sentiment.overall_sentiment.negative ?? 0) * 100).toFixed(1)}%
                             </div>
                             <div className="text-sm text-red-700 font-medium">Negative</div>
                           </div>
@@ -533,25 +523,27 @@ const DocumentAnalysis: React.FC = () => {
                         )}
 
                         {/* Recent Headlines */}
-                        {(sentimentData as any).news_sentiment.recent_headlines && (
+                        {((sentimentData as any).news_sentiment.recent_headlines || (sentimentData as any).news_sentiment.recent_articles) && (
                           <div>
                             <h4 className="font-medium text-gray-900 mb-3">Recent Headlines</h4>
                             <div className="space-y-3">
-                              {(sentimentData as any).news_sentiment.recent_headlines.map((headline: any, index: number) => (
+                              {(((sentimentData as any).news_sentiment.recent_headlines || (sentimentData as any).news_sentiment.recent_articles) as any[]).map((headline: any, index: number) => (
                                 <div key={index} className="border border-gray-200 rounded-lg p-3">
                                   <div className="flex justify-between items-start gap-3">
                                     <p className="text-sm text-gray-900 leading-relaxed flex-1">
                                       {headline.title}
                                     </p>
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                      headline.sentiment_label === 'positive' 
-                                        ? 'bg-green-100 text-green-800'
-                                        : headline.sentiment_label === 'negative'
-                                        ? 'bg-red-100 text-red-800'
-                                        : 'bg-gray-100 text-gray-800'
-                                    }`}>
-                                      {headline.sentiment_label}
-                                    </span>
+                                    {headline.sentiment_label && (
+                                      <span className={`${
+                                        headline.sentiment_label === 'positive' 
+                                          ? 'badge badge-success'
+                                          : headline.sentiment_label === 'negative'
+                                          ? 'badge badge-danger'
+                                          : 'badge badge-secondary'
+                                      } text-xs`}>
+                                        {headline.sentiment_label}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               ))}

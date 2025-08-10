@@ -180,9 +180,9 @@ async def get_documents(
                 id=doc_name,
                 name=doc_name,
                 company=metadata.get('company', company_name),
-                sector=metadata.get('gics_sector', 'Unknown'),
-                doc_type=metadata.get('doc_type', doc_type_parsed),
-                period=str(metadata.get('doc_period', year)),
+                sector=str(metadata.get('gics_sector', 'Unknown') or 'Unknown'),
+                doc_type=str(metadata.get('doc_type', doc_type_parsed) or doc_type_parsed),
+                period=str(metadata.get('doc_period', year) or year),
                 year=str(year),
                 doc_link=metadata.get('doc_link'),
                 financial_metrics=financial_metrics
@@ -571,13 +571,15 @@ async def ask_question(request: QARequest):
 
 # Stage 2 & 3 placeholder endpoints
 @app.post("/api/forecast", response_model=APIResponse)
-async def create_forecast(ticker: str = Query(..., min_length=1), period: str = Query("5y"), horizon: int = Query(5, ge=1, le=30)):
-    """Run a lightweight price forecasting pipeline using yfinance + RandomForest.
+async def create_forecast(ticker: str = Query(..., min_length=1), period: str = Query("5y"), horizon: int = Query(5, ge=1, le=30), model: str = Query("rf", description="Model to use: rf|prophet|lstm")):
+    """Run a lightweight price forecasting pipeline using selectable model.
 
-    Inspired by the approach in a public NVDA prediction notebook [predict_nvda.ipynb].
+    rf: RandomForestRegressor (default)
+    prophet: Facebook Prophet (if installed)
+    lstm: Keras LSTM (if installed)
     """
     try:
-        result = run_forecast(ticker=ticker.upper(), period=period, horizon=horizon)
+        result = run_forecast(ticker=ticker.upper(), period=period, horizon=horizon, model=model)
         data = {
             "ticker": result.ticker,
             "model": result.model,

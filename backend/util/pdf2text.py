@@ -45,10 +45,11 @@ except Exception:  # fallback
 ##############################################################################
 # PATHS (align with both notebook experiments and repo dataset layout)
 ##############################################################################
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 FINANCEBENCH_ROOT = REPO_ROOT / "datasets" / "financebench"
 PATH_PDFS_CWD = Path(os.getcwd()) / "pdfs"
 PATH_PDFS_FB = FINANCEBENCH_ROOT / "pdfs"
+PATH_PDFS_GENERIC = REPO_ROOT / "datasets" / "pdfs"
 
 
 def _ensure_pdf_path(doc_or_path: str | Path) -> Path:
@@ -68,7 +69,7 @@ def _ensure_pdf_path(doc_or_path: str | Path) -> Path:
     if not name.endswith(".pdf"):
         name = name + ".pdf"
 
-    for root in (PATH_PDFS_CWD, PATH_PDFS_FB):
+    for root in (PATH_PDFS_CWD, PATH_PDFS_GENERIC, PATH_PDFS_FB):
         candidate = root / name
         if candidate.exists():
             return candidate

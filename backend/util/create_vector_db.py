@@ -4,10 +4,13 @@ import chromadb
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from tqdm import tqdm
 from .pdf_text_extraction import parse_pdf_with_nice_tables
+from logger import logging
 
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-print(OPENAI_API_KEY)
+# Environment variables
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+if not OPENAI_API_KEY:
+    logger = logging.getLogger(__name__)
+    logger.warning("OPENAI_API_KEY is not set.")
 
 
 def get_pdf_name(pdf_path: str) -> str:

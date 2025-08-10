@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, BrainCircuit } from 'lucide-react';
+import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, BrainCircuit, ExternalLink, HelpCircle } from 'lucide-react';
 import { apiService } from '../services/api';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend, Area, AreaChart } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend, Brush } from 'recharts';
 
 const periods = [
   { label: '1y', value: '1y' },
@@ -55,15 +55,31 @@ const Forecasting: React.FC = () => {
     }
   };
 
-  const combinedData = React.useMemo((): { hist: any[]; preds: any[]; lastDate: string | undefined } => {
-    if (!result) return { hist: [], preds: [], lastDate: undefined };
+  const combinedData = React.useMemo((): { hist: any[]; preds: any[]; lastDate: string | undefined; merged: any[] } => {
+    if (!result) return { hist: [], preds: [], lastDate: undefined, merged: [] };
     const hist = (result.history || []).map((d: any) => ({ date: d.date, close: d.close }));
     const lastDate = hist.length ? hist[hist.length - 1].date : undefined;
     const preds = (result.predictions || []).map((d: any) => ({ date: d.date, pred: d.pred }));
-    return { hist, preds, lastDate };
+
+    // Merge by date for a single data source in LineChart (required for Brush)
+    const map = new Map<string, any>();
+    for (const h of hist) {
+      map.set(h.date, { date: h.date, close: h.close });
+    }
+    for (const p of preds) {
+      const existing = map.get(p.date) || { date: p.date };
+      existing.pred = p.pred;
+      map.set(p.date, existing);
+    }
+    const merged = Array.from(map.values()).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    return { hist, preds, lastDate, merged };
   }, [result]);
 
   const overallNews = news?.overall_sentiment || { positive: 0, neutral: 0, negative: 0 };
+  const posPct = Math.round((overallNews.positive || 0) * 100);
+  const neuPct = Math.round((overallNews.neutral || 0) * 100);
+  const negPct = Math.round((overallNews.negative || 0) * 100);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -89,25 +105,44 @@ const Forecasting: React.FC = () => {
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input className="form-input pl-9" placeholder="AAPL, NVDA, MSFT" value={ticker} onChange={(e)=>setTicker(e.target.value)} />
                 </div>
+                <div className="text-xs text-slate-500 mt-1">Public market symbol (case-insensitive).</div>
               </div>
 
               <div>
-                <label className="form-label">Period</label>
+                <label className="form-label inline-flex items-center gap-1">
+                  Period
+                  <span title="How much history to load. Used for model training and shown on the chart.">
+                    <HelpCircle size={14} className="text-gray-400" />
+                  </span>
+                </label>
                 <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
                   {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
+                <div className="text-xs text-slate-500 mt-1">History window used for training and chart context.</div>
               </div>
 
               <div>
-                <label className="form-label">Horizon (days)</label>
+                <label className="form-label inline-flex items-center gap-1">
+                  Horizon (days)
+                  <span title="How many future trading days to predict.">
+                    <HelpCircle size={14} className="text-gray-400" />
+                  </span>
+                </label>
                 <input className="form-input" type="number" min={1} max={30} value={horizon} onChange={(e)=>setHorizon(parseInt(e.target.value||'5'))} />
+                <div className="text-xs text-slate-500 mt-1">Forecast length (future trading days).</div>
               </div>
 
               <div>
-                <label className="form-label">Model</label>
+                <label className="form-label inline-flex items-center gap-1">
+                  Model
+                  <span title="Algorithm used to forecast. Prophet may take longer on first run (CmdStan compile). LSTM trains a small neural net.">
+                    <HelpCircle size={14} className="text-gray-400" />
+                  </span>
+                </label>
                 <select className="form-input" value={model} onChange={(e)=>setModel(e.target.value)}>
                   {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
+                <div className="text-xs text-slate-500 mt-1">Choose RF, Prophet, or LSTM.</div>
               </div>
 
               <div className="flex items-end">
@@ -135,20 +170,21 @@ const Forecasting: React.FC = () => {
                 </h3>
                 {result && <div className="text-sm text-slate-600">{result.ticker} • {result.model} • MAE: {result.mae.toFixed(2)}</div>}
               </div>
-              <div className="card-body" style={{height: 440}}>
+              <div className="card-body" style={{height: 480}}>
                 {result ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <LineChart data={combinedData.merged} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} allowDuplicatedCategory={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
                       <Tooltip />
                       <Legend />
-                      <Line dataKey="close" name="History" stroke="#0ea5e9" strokeWidth={2} dot={false} data={combinedData.hist} />
+                      <Line dataKey="close" name="History" stroke="#0ea5e9" strokeWidth={2} dot={false} connectNulls />
                       {combinedData.lastDate && (
                         <ReferenceLine x={combinedData.lastDate} stroke="#94a3b8" strokeDasharray="3 3" />
                       )}
-                      <Line dataKey="pred" name="Forecast" stroke="#2563eb" strokeWidth={2} dot={false} data={combinedData.preds} />
+                      <Line dataKey="pred" name="Forecast" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
+                      <Brush dataKey="date" height={24} travellerWidth={8} className="mt-2" />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -176,18 +212,25 @@ const Forecasting: React.FC = () => {
 
                 {news && (
                   <>
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      <div className="bg-green-50 rounded p-3">
-                        <div className="text-lg font-bold text-green-600">{(overallNews.positive * 100).toFixed(0)}%</div>
-                        <div className="text-xs text-green-700">Positive</div>
+                    {/* Colored bars */}
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-xs mb-1"><span className="text-green-700">Positive</span><span className="text-green-700">{posPct}%</span></div>
+                        <div className="w-full h-2 bg-green-100 rounded">
+                          <div className="h-2 bg-green-500 rounded" style={{ width: `${posPct}%` }} />
+                        </div>
                       </div>
-                      <div className="bg-gray-50 rounded p-3">
-                        <div className="text-lg font-bold text-gray-600">{(overallNews.neutral * 100).toFixed(0)}%</div>
-                        <div className="text-xs text-gray-700">Neutral</div>
+                      <div>
+                        <div className="flex justify-between text-xs mb-1"><span className="text-gray-700">Neutral</span><span className="text-gray-700">{neuPct}%</span></div>
+                        <div className="w-full h-2 bg-gray-100 rounded">
+                          <div className="h-2 bg-gray-500 rounded" style={{ width: `${neuPct}%` }} />
+                        </div>
                       </div>
-                      <div className="bg-red-50 rounded p-3">
-                        <div className="text-lg font-bold text-red-600">{(overallNews.negative * 100).toFixed(0)}%</div>
-                        <div className="text-xs text-red-700">Negative</div>
+                      <div>
+                        <div className="flex justify-between text-xs mb-1"><span className="text-red-700">Negative</span><span className="text-red-700">{negPct}%</span></div>
+                        <div className="w-full h-2 bg-red-100 rounded">
+                          <div className="h-2 bg-red-500 rounded" style={{ width: `${negPct}%` }} />
+                        </div>
                       </div>
                     </div>
 
@@ -200,19 +243,32 @@ const Forecasting: React.FC = () => {
                     <div>
                       <h4 className="font-medium text-slate-900 mb-2">Recent Headlines</h4>
                       <div className="space-y-2">
-                        {(news.recent_headlines || news.articles || []).slice(0,5).map((h: any, i: number) => (
-                          <div key={i} className="border border-gray-200 rounded p-2">
-                            <div className="text-sm text-slate-900">{h.title}</div>
-                            {h.sentiment_label && (
-                              <div className={`inline-flex px-2 py-0.5 rounded-full text-xs mt-1 ${
-                                h.sentiment_label === 'positive' ? 'bg-green-100 text-green-700' :
-                                h.sentiment_label === 'negative' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                              }`}>
-                                {h.sentiment_label}
+                        {(news.recent_headlines || news.articles || []).slice(0,5).map((h: any, i: number) => {
+                          const label = h.sentiment_label;
+                          const border = label === 'positive' ? 'border-green-200' : label === 'negative' ? 'border-red-200' : 'border-gray-200';
+                          const badge = label === 'positive' ? 'bg-green-100 text-green-700' : label === 'negative' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700';
+                          const title = h.title || 'Untitled';
+                          const url = h.url;
+                          const source = h.source || '';
+                          return (
+                            <div key={i} className={`border ${border} rounded p-2`}>
+                              <div className="flex items-start justify-between gap-3">
+                                {url ? (
+                                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-900 hover:text-blue-600 underline flex-1 inline-flex items-center gap-1">
+                                    {title}
+                                    <ExternalLink size={14} className="text-blue-600" />
+                                  </a>
+                                ) : (
+                                  <div className="text-sm text-slate-900 flex-1">{title}</div>
+                                )}
+                                {label && <div className={`inline-flex px-2 py-0.5 rounded-full text-xs ${badge}`}>{label}</div>}
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              {(source || h.published_at) && (
+                                <div className="mt-1 text-xs text-slate-500">{[source, h.published_at]?.filter(Boolean).join(' • ')}</div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </>

@@ -123,16 +123,11 @@ const DocumentAnalysis: React.FC = () => {
     
     setSentimentLoading(true);
     try {
-      // Try enhanced sentiment first, fallback to basic sentiment
+      // Prefer enhanced endpoint for robust document sentiment, but ignore news sentiment
       try {
         const enhanced = await apiService.getEnhancedDocumentSentiment(document.id);
-        // Normalize shape: pick document_sentiment as the SentimentAnalysis
         const docSent = (enhanced && (enhanced.document_sentiment || enhanced.sentiment)) ?? enhanced;
         const normalized = docSent as SentimentAnalysis;
-        // Attach news_sentiment only if it has overall_sentiment to avoid runtime errors
-        if (enhanced && enhanced.news_sentiment && enhanced.news_sentiment.overall_sentiment) {
-          (normalized as any).news_sentiment = enhanced.news_sentiment;
-        }
         setSentimentData(normalized);
       } catch (enhancedError) {
         console.warn('Enhanced sentiment failed, trying basic sentiment:', enhancedError);
@@ -479,77 +474,6 @@ const DocumentAnalysis: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* News Sentiment */}
-                  {(sentimentData as any).news_sentiment && (sentimentData as any).news_sentiment.overall_sentiment && (
-                    <div className="card">
-                      <div className="card-header">
-                        <h3 className="text-xl font-semibold">Recent News Sentiment</h3>
-                      </div>
-                      <div className="card-body space-y-4">
-                        {/* Overall News Sentiment */}
-                        <div className="grid md:grid-cols-3 gap-4 mb-6">
-                          <div className="text-center p-4 bg-green-50 rounded-lg">
-                            <div className="text-xl font-bold text-green-600">
-                              {(((sentimentData as any).news_sentiment.overall_sentiment.positive ?? 0) * 100).toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-green-700 font-medium">Positive</div>
-                          </div>
-                          <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <div className="text-xl font-bold text-gray-600">
-                              {(((sentimentData as any).news_sentiment.overall_sentiment.neutral ?? 0) * 100).toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-gray-700 font-medium">Neutral</div>
-                          </div>
-                          <div className="text-center p-4 bg-red-50 rounded-lg">
-                            <div className="text-xl font-bold text-red-600">
-                              {(((sentimentData as any).news_sentiment.overall_sentiment.negative ?? 0) * 100).toFixed(1)}%
-                            </div>
-                            <div className="text-sm text-red-700 font-medium">Negative</div>
-                          </div>
-                        </div>
-
-                        {/* News Summary */}
-                        {(sentimentData as any).news_sentiment.summary && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                            <h4 className="font-medium text-blue-900 mb-2">News Summary</h4>
-                            <p className="text-blue-800 text-sm leading-relaxed">
-                              {(sentimentData as any).news_sentiment.summary}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Recent Headlines */}
-                        {((sentimentData as any).news_sentiment.recent_headlines || (sentimentData as any).news_sentiment.recent_articles) && (
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-3">Recent Headlines</h4>
-                            <div className="space-y-3">
-                              {(((sentimentData as any).news_sentiment.recent_headlines || (sentimentData as any).news_sentiment.recent_articles) as any[]).map((headline: any, index: number) => (
-                                <div key={index} className="border border-gray-200 rounded-lg p-3">
-                                  <div className="flex justify-between items-start gap-3">
-                                    <p className="text-sm text-gray-900 leading-relaxed flex-1">
-                                      {headline.title}
-                                    </p>
-                                    {headline.sentiment_label && (
-                                      <span className={`${
-                                        headline.sentiment_label === 'positive' 
-                                          ? 'badge badge-success'
-                                          : headline.sentiment_label === 'negative'
-                                          ? 'badge badge-danger'
-                                          : 'badge badge-secondary'
-                                      } text-xs`}>
-                                        {headline.sentiment_label}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}

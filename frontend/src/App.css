@@ -835,3 +835,31 @@ textarea.form-input {
 /* Keep tab container from collapsing */
 .tabs { align-items: center; }
 /* ---- End utility layer ---- */
+
+/* --- Sentiment color utilities (lightweight Tailwind-like) --- */
+.bg-green-50 { background-color: #f0fdf4; }
+.bg-green-100 { background-color: #dcfce7; }
+.bg-green-500 { background-color: #22c55e; }
+.text-green-600 { color: #16a34a; }
+.text-green-700 { color: #15803d; }
+.border-green-200 { border-color: #bbf7d0; }
+
+/* Neutral (black/white → gray scale) */
+.bg-gray-50 { background-color: #f9fafb; }
+.bg-gray-100 { background-color: #f3f4f6; }
+.bg-gray-500 { background-color: #6b7280; }
+.text-gray-600 { color: #4b5563; }
+.text-gray-700 { color: #374151; }
+.border-gray-200 { border-color: #e5e7eb; }
+
+.bg-red-50 { background-color: #fef2f2; }
+.bg-red-100 { background-color: #fee2e2; }
+.bg-red-500 { background-color: #ef4444; }
+.text-red-600 { color: #dc2626; }
+.text-red-700 { color: #b91c1c; }
+.border-red-200 { border-color: #fecaca; }
+
+.bg-blue-50 { background-color: #eff6ff; }
+.border-blue-200 { border-color: #bfdbfe; }
+.text-blue-900 { color: #1e3a8a; }
+/* --- End sentiment color utilities --- */

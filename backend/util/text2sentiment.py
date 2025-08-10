@@ -111,16 +111,3 @@ def text2sentiment(text_list: List[str]) -> List[SentimentSummary]:
         )
         results.append(summary)
     return results
-
-
-# Example usage
-if __name__ == "__main__":
-    sample_texts = [
-        "The service was terrible and the food was cold.",
-        "I absolutely loved the movie!",
-        "It was okay, nothing special.",
-    ]
-
-    sentiment_summaries = text2sentiment(sample_texts)
-    for summary in sentiment_summaries:
-        print(summary)

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import DocumentAnalysis from './pages/DocumentAnalysis';
 import Forecasting from './pages/Forecasting';
 import InvestmentStrategy from './pages/InvestmentStrategy';
+import HowToUse from './pages/HowToUse';
 import './App.css';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
             <Route path="/document/:documentId" element={<DocumentAnalysis />} />
             <Route path="/forecasting" element={<Forecasting />} />
             <Route path="/investment-strategy" element={<InvestmentStrategy />} />
+            <Route path="/how-to-use" element={<HowToUse />} />
           </Routes>
         </main>
       </div>

@@ -2,12 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   FileText, 
-  Building2, 
   Calendar, 
   Search, 
-  TrendingUp,
   BarChart3,
-  Target,
   ChevronRight
 } from 'lucide-react';
 import { Document } from '../types';
@@ -145,54 +142,8 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Three Stages Overview */}
+      {/* Main Content: Document Library only (stages removed) */}
       <div className="container mx-auto px-6 py-12">
-        <h2 className="text-3xl font-bold text-center mb-8">Three Stages of AI-Powered Finance</h2>
-        
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
-          {/* Stage 1: Document Q&A */}
-          <div className="card fade-in hover-lift">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="text-blue-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Stage 1: Document Q&A</h3>
-              <p className="text-gray-600 mb-4">
-                Analyze financial reports and extract key insights through natural language queries.
-              </p>
-              <span className="badge badge-success">Active</span>
-            </div>
-          </div>
-
-          {/* Stage 2: Financial Forecasting */}
-          <div className="card fade-in hover-lift" style={{animationDelay: '0.1s'}}>
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="text-orange-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Stage 2: Financial Forecasting</h3>
-              <p className="text-gray-600 mb-4">
-                Predict future financial trends and market performance using historical data.
-              </p>
-              <span className="badge badge-warning">Coming Soon</span>
-            </div>
-          </div>
-
-          {/* Stage 3: Investment Strategy */}
-          <div className="card fade-in hover-lift" style={{animationDelay: '0.2s'}}>
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="text-green-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Stage 3: Investment Strategy</h3>
-              <p className="text-gray-600 mb-4">
-                Generate actionable buy/sell recommendations based on AI analysis.
-              </p>
-              <span className="badge badge-warning">Coming Soon</span>
-            </div>
-          </div>
-        </div>
-
         {/* Document Library */}
         <div className="bg-white rounded-xl shadow-lg p-6 library-panel">
           <div className="flex items-center justify-between mb-6">

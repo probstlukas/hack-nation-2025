@@ -107,6 +107,19 @@ const InvestmentStrategy: React.FC = () => {
       .sort((a: any, b: any) => a.year - b.year);
   }, [rec]);
 
+  // Dynamic Y-axis domain to highlight small sentiment changes
+  const docYDomain = React.useMemo(() => {
+    if (!docBreakdown || docBreakdown.length === 0) return null as [number, number] | null;
+    const vals = docBreakdown.map((d: any) => (typeof d.score === 'number' ? d.score : 0));
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    if (!isFinite(min) || !isFinite(max)) return null as [number, number] | null;
+    const span = max - min;
+    let pad = Math.max(0.02, span * 0.4);
+    if (span < 1e-6) pad = 0.1; // flat series → show a small band around zero
+    return [min - pad, max + pad] as [number, number];
+  }, [docBreakdown]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white/60 backdrop-blur border-b">
@@ -209,7 +222,7 @@ const InvestmentStrategy: React.FC = () => {
                         <LineChart data={docBreakdown} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                          <YAxis domain={[-1, 1]} tick={{ fontSize: 12 }} />
+                          <YAxis domain={docYDomain || [-1, 1]} tick={{ fontSize: 12 }} tickFormatter={(v: number) => Number(v).toFixed(2)} />
                           <Tooltip formatter={(v: any) => (typeof v === 'number' ? v.toFixed(2) : v)} labelFormatter={(l: any) => `Year: ${l}`} />
                           <Line type="monotone" dataKey="score" stroke="#16a34a" dot={{ r: 2 }} />
                         </LineChart>

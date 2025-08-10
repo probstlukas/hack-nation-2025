@@ -97,6 +97,32 @@ const Forecasting: React.FC = () => {
     }
     const merged = Array.from(map.values()).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
+    // Build directional forecast series: predUp (green) and predDown (red)
+    const lastClose = hist.length ? hist[hist.length - 1].close : undefined;
+    const lastIdx = lastDate ? merged.findIndex((d) => d.date === lastDate) : -1;
+    const firstPredIdx = merged.findIndex((d) => typeof d.pred === 'number');
+
+    let prev: number | undefined = lastIdx >= 0 ? lastClose : undefined;
+    for (let i = firstPredIdx; i >= 0 && i < merged.length; i++) {
+      const y = merged[i]?.pred;
+      if (typeof y !== 'number') continue;
+      const isUp = prev !== undefined && y >= prev;
+
+      if (prev !== undefined && lastIdx >= 0 && i === firstPredIdx) {
+        // Connect from last historical close to first prediction with proper color
+        if (isUp) {
+          merged[lastIdx].predUp = prev;
+          merged[i].predUp = y;
+        } else {
+          merged[lastIdx].predDown = prev;
+          merged[i].predDown = y;
+        }
+      } else {
+        if (isUp) merged[i].predUp = y; else merged[i].predDown = y;
+      }
+      prev = y;
+    }
+
     return { hist, preds, lastDate, merged };
   }, [result]);
 
@@ -250,6 +276,8 @@ const Forecasting: React.FC = () => {
   const filteredSentimentSeries = React.useMemo(() => (sentimentSeries || []).filter((d: any) => isInVisibleRange(d.date)), [sentimentSeries, isInVisibleRange]);
   const filteredDocSentiments = React.useMemo(() => (docSentiments || []).filter((d: any) => isInVisibleRange(d.date)), [docSentiments, isInVisibleRange]);
 
+  // Y-axis for document sentiment bars stays fixed to [-1, 1] to avoid exaggerating small differences
+
   const overallNews = news?.overall_sentiment || { positive: 0, neutral: 0, negative: 0 };
   const posPct = Math.round((overallNews.positive || 0) * 100);
   const neuPct = Math.round((overallNews.neutral || 0) * 100);
@@ -287,9 +315,11 @@ const Forecasting: React.FC = () => {
                 <label className="form-label inline-flex items-center gap-1">
                   Period
                 </label>
-                <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
-                  {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
+                <div className="select-wrap">
+                  <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
+                    {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
                 <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">History window used for training and chart context.</div>
               </div>
 
@@ -305,9 +335,11 @@ const Forecasting: React.FC = () => {
                 <label className="form-label inline-flex items-center gap-1">
                   Model
                 </label>
-                <select className="form-input" value={model} onChange={(e)=>setModel(e.target.value)}>
-                  {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
+                <div className="select-wrap">
+                  <select className="form-input" value={model} onChange={(e)=>setModel(e.target.value)}>
+                    {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
                 <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">Choose RF, Prophet, or LSTM.</div>
               </div>
 
@@ -342,14 +374,16 @@ const Forecasting: React.FC = () => {
                     <LineChart data={combinedData.merged} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
+                      <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} tickFormatter={(v: number) => Number(v).toFixed(2)} />
                       <RechartsTooltip />
                       <Legend />
                       <Line dataKey="close" name="History" stroke="#0ea5e9" strokeWidth={2} dot={false} connectNulls />
                       {combinedData.lastDate && (
                         <ReferenceLine x={combinedData.lastDate} stroke="#94a3b8" strokeDasharray="3 3" />
                       )}
-                      <Line dataKey="pred" name="Forecast" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
+                      {/* Forecast: green when up, red when down */}
+                      <Line dataKey="predUp" name="Forecast (Up)" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="5 5" />
+                      <Line dataKey="predDown" name="Forecast (Down)" stroke="#dc2626" strokeWidth={2} dot={false} connectNulls={false} strokeDasharray="5 5" />
                       <Brush
                         dataKey="date"
                         height={40}
@@ -399,7 +433,7 @@ const Forecasting: React.FC = () => {
                       <BarChart data={filteredSentimentSeries} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                        <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} />
+                        <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} tickFormatter={(v: number) => Number(v).toFixed(2)} />
                         <RechartsTooltip formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Sentiment']} />
                         <ReferenceLine y={0} stroke="#94a3b8" />
                         <Bar dataKey="sentiment" radius={[4, 4, 0, 0]}>
@@ -426,7 +460,7 @@ const Forecasting: React.FC = () => {
                       <BarChart data={filteredDocSentiments} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                        <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} />
+                        <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} tickFormatter={(v: number) => Number(v).toFixed(2)} />
                         <RechartsTooltip formatter={(v: any, _n: any, p: any) => [typeof v === 'number' ? v.toFixed(2) : v, p && p.payload ? `${p.payload.company} • ${p.payload.label || ''}` : 'Document']} />
                         <ReferenceLine y={0} stroke="#94a3b8" />
                         <Bar dataKey="sentiment" radius={[4, 4, 0, 0]}>

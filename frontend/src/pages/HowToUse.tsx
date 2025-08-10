@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Target, TrendingUp, HelpCircle } from 'lucide-react';
+import { FileText, Target, TrendingUp, HelpCircle, BrainCircuit } from 'lucide-react';
 
 const HowToUse: React.FC = () => {
   return (
@@ -59,6 +59,21 @@ const HowToUse: React.FC = () => {
               <li>The default forecast model is LSTM; try others if you prefer.</li>
               <li>News sentiment needs a valid API key configured in the backend environment.</li>
               <li>Use the Dashboard to copy the exact document ID for recommendations.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="card mt-6">
+          <div className="card-header flex items-center gap-2">
+            <BrainCircuit size={18} />
+            <h3 className="font-semibold">Forecasting Models</h3>
+          </div>
+          <div className="card-body text-sm text-slate-700 space-y-2">
+            <p>Choose between RandomForest, Prophet, or LSTM. Prophet may take longer on first run as it compiles CmdStan; LSTM trains a small neural net.</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Predict near‑term movements (1–30 days)</li>
+              <li>Evaluate with MAE against holdout</li>
+              <li>Overlay predictions on recent price chart</li>
             </ul>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, BrainCircuit, ExternalLink, HelpCircle } from 'lucide-react';
+import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, ExternalLink } from 'lucide-react';
 import { apiService } from '../services/api';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, ReferenceLine, Legend, Brush, AreaChart, Area } from 'recharts';
 
@@ -287,22 +287,6 @@ const Forecasting: React.FC = () => {
                 {!newsLoading && !news && (
                   <div className="text-sm text-slate-500">Run a forecast to load news sentiment for the ticker.</div>
                 )}
-              </div>
-            </div>
-
-            {/* Models blurb */}
-            <div className="card mt-6">
-              <div className="card-header flex items-center gap-2">
-                <BrainCircuit size={18} />
-                <h3 className="font-semibold">Forecasting Models</h3>
-              </div>
-              <div className="card-body text-sm text-slate-700 space-y-2">
-                <p>Choose between RandomForest, Prophet, or LSTM. Prophet may take longer on first run as it compiles CmdStan; LSTM trains a small neural net.</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>Predict near‑term movements (1–30 days)</li>
-                  <li>Evaluate with MAE against holdout</li>
-                  <li>Overlay predictions on recent price chart</li>
-                </ul>
               </div>
             </div>
           </div>

@@ -217,7 +217,8 @@ Try these sample questions:
 ## 🔮 Future Enhancements
 
 ### Stage 1: Financial Document Analysis and Q&A
-- **Improved Metric Extraction**: Use pattern matching (reports are structured), prompt engineering or a combination of both
+- **Improved Metric Extraction**: Use pattern matching and keyword search (reports are partially structured), prompt engineering or a combination of both
+- **Improved RAG**: Employ different kinds of document indices for better content retrieval (e.g., LLM-generated summaries)
 
 ### Stage 2: Advanced Forecasting
 - **Machine Learning Models**: Use more sophisticated models and include financial metrics from the reports as features

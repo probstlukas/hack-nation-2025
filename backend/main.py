@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field
 import logging
+from datetime import datetime, date  # Added for recency weighting
 
 # Import our PDF processing utilities
 from backend.util.pdf2text import (
@@ -33,7 +34,10 @@ from backend.util.pdf2text import (
     detect_doc_type,
     get_text,
     chunk_documents,
-    extract_financial_metrics
+    extract_financial_metrics,
+    PATH_PDFS_CWD,
+    PATH_PDFS_FB,
+    PATH_PDFS_GENERIC,
 )
 from backend.util.text2sentiment import text2sentiment, SentimentSummary
 from backend.util.retrieval import answer_question
@@ -103,27 +107,48 @@ class InvestmentRecommendation(BaseModel):
     components: Optional[Dict[str, Any]] = None
 
 class InvestmentRequest(BaseModel):
-    document_id: str = Field(..., description="ID of the FinanceBench document")
+    document_id: Optional[str] = Field(None, description="Optional ID of a FinanceBench document")
+    document_ids: Optional[List[str]] = Field(None, description="Optional list of FinanceBench document IDs to aggregate")
     ticker: Optional[str] = Field(None, description="Optional market ticker to run forecast (e.g. AAPL)")
     period: str = Field("5y", description="History period for forecast")
     horizon: int = Field(5, ge=1, le=30, description="Forecast horizon in trading days")
     model: str = Field("lstm", description="Forecast model: rf|prophet|lstm")
     include_news: bool = Field(True, description="Include recent news sentiment")
 
-# Heuristic company->ticker mapping (extend as needed)
-COMPANY_TICKERS = {
-    "3M": "MMM",
-    "AMAZON": "AMZN",
-    "ADOBE": "ADBE",
-    "AES": "AES",
-    "AMCOR": "AMCR",
-    "APPLE": "AAPL",
-    "MICROSOFT": "MSFT",
-    "NVIDIA": "NVDA",
-    "TESLA": "TSLA",
-    "INTEL": "INTC",
-    "IBM": "IBM",
-}
+# Utility: derive an approximate document date from FinanceBench metadata
+def _doc_date_for_id(doc_id: str) -> Optional[datetime]:
+    try:
+        meta = FINANCEBENCH_INDEX.get(doc_id) or {}
+        year = meta.get("year")
+        period = str(meta.get("period", ""))
+        y = None
+        if isinstance(year, (int, float)):
+            y = int(year)
+        else:
+            try:
+                y = int(str(year)) if year is not None else None
+            except Exception:
+                y = None
+        if y is None:
+            # Try to infer year from id like COMPANY_2019_10K.pdf or COMPANY_2023Q2_10Q.pdf
+            import re
+            m = re.search(r"(20\d{2}|19\d{2})", doc_id)
+            if m:
+                y = int(m.group(1))
+        if y is None:
+            return None
+        # Quarter handling
+        import re
+        q = re.search(r"Q([1-4])", period or "")
+        if not q:
+            q = re.search(r"Q([1-4])", doc_id)
+        if q:
+            qn = int(q.group(1))
+            month_day = "03-31" if qn == 1 else "06-30" if qn == 2 else "09-30" if qn == 3 else "12-31"
+            return datetime.strptime(f"{y}-{month_day}", "%Y-%m-%d")
+        return datetime.strptime(f"{y}-12-31", "%Y-%m-%d")
+    except Exception:
+        return None
 
 def _company_from_doc_id(doc_id: str) -> str:
     try:
@@ -650,26 +675,199 @@ async def create_forecast(ticker: str = Query(..., min_length=1), period: str = 
 @app.post("/api/investment-recommendation", response_model=APIResponse)
 async def get_investment_recommendation(req: InvestmentRequest):
     """Compute an investment recommendation by combining:
-    - Document sentiment (Stage 1)
-    - Optional recent news sentiment
+    - Document sentiment (Stage 1, if document provided)
+    - Optional recent news sentiment (from document company or ticker)
     - Optional price forecast (Stage 2)
     Returns BUY/SELL/HOLD with confidence, reasoning, and optional target price.
     """
     try:
-        # 1) Document sentiment
-        text = get_text(req.document_id)
-        if not text:
-            raise HTTPException(status_code=404, detail="Document text not found")
-        doc_summary = text2sentiment([text])[0]
-        # Convert to scores
-        pos = max(0.0, float(doc_summary.pos)) if hasattr(doc_summary, 'pos') else max(0.0, float(doc_summary.textblob_pos if hasattr(doc_summary, 'textblob_pos') else 0))
-        neg = max(0.0, float(doc_summary.neg)) if hasattr(doc_summary, 'neg') else max(0.0, float(doc_summary.textblob_neg if hasattr(doc_summary, 'textblob_neg') else 0))
-        doc_score = float(pos - neg)  # [-1,1] approx
-
-        # 2) News sentiment (optional)
-        company = _company_from_doc_id(req.document_id)
+        doc_score: Optional[float] = None
+        pos = 0.0
+        neg = 0.0
         news_part = None
         news_score = None
+        forecast_part = None
+        forecast_score = None
+        # Collect per-document sentiment for charting
+        doc_breakdown: List[Dict[str, Any]] = []
+
+        # 1) Document sentiment (optional, supports multiple docs)
+        company = ""
+        used_documents: List[str] = []
+        if req.document_ids:
+            # Normalize requested ids to actual FinanceBench entries by company name matching when user passes a company string
+            normalized_ids: List[str] = []
+            for did in req.document_ids:
+                if did in FINANCEBENCH_INDEX:
+                    normalized_ids.append(did)
+            # If none were valid doc IDs and the client meant a company, try match by company substring (case-insensitive)
+            if not normalized_ids and len(req.document_ids) == 1 and not req.document_id:
+                q = str(req.document_ids[0]).strip().lower()
+                # Treat as company needle
+                for key, meta in FINANCEBENCH_INDEX.items():
+                    comp = str(meta.get('company', '')).strip().lower()
+                    if not comp:
+                        continue
+                    if q in comp or comp in q:
+                        normalized_ids.append(key)
+                # De-duplicate and optionally cap to avoid overload
+                normalized_ids = list(dict.fromkeys(normalized_ids))[:50]
+            doc_ids_to_use = normalized_ids if normalized_ids else req.document_ids
+
+            # Prefer most recent documents to improve reliability and latency
+            try:
+                pairs = []
+                for did in doc_ids_to_use:
+                    dt = _doc_date_for_id(did)
+                    pairs.append((did, dt or datetime(1970, 1, 1)))
+                pairs.sort(key=lambda x: x[1], reverse=True)
+                # Cap to top 12 most recent docs to avoid timeouts on large companies
+                doc_ids_to_use = [p[0] for p in pairs[:12]]
+            except Exception:
+                # Fallback: keep original order but cap to 12
+                doc_ids_to_use = (doc_ids_to_use or [])[:12]
+
+            # Aggregate document sentiment with recency weighting (newest docs weigh more)
+            weighted_sum = 0.0
+            total_w = 0.0
+            for did in doc_ids_to_use:
+                try:
+                    # Load text robustly
+                    text = _safe_get_text(did)
+                    if not text:
+                        logger.warning(f"No text loaded for {did}; skipping")
+                        continue
+                    doc_summary = text2sentiment([text])[0]
+                    # Use TextBlob polarity directly (-1..1)
+                    pol = float(getattr(doc_summary, 'textblob_polarity', 0.0))
+                    s = pol
+
+                    # Recency weight: w = 1 / (1 + age_years)
+                    dt = _doc_date_for_id(did)
+                    if dt is not None:
+                        age_years = max(0.0, (datetime.utcnow() - dt).days / 365.25)
+                        w = 1.0 / (1.0 + age_years)
+                    else:
+                        w = 1.0
+
+                    weighted_sum += float(s) * w
+                    total_w += w
+
+                    # Track used document canonical id
+                    resolved_id = _resolve_doc_id(did) or did
+                    used_documents.append(resolved_id)
+                    if not company:
+                        company = _company_from_doc_id(resolved_id)
+
+                    # Add to breakdown for charting
+                    doc_breakdown.append({
+                        "id": resolved_id,
+                        "score": s,
+                        "weight": w,
+                        "date": dt.isoformat() if dt else None,
+                        "year": dt.year if dt else None,
+                    })
+                except Exception as e:
+                    logger.warning(f"Doc sentiment failed for {did}: {e}")
+                    continue
+            if total_w > 0:
+                doc_score = float(weighted_sum / total_w)
+        elif req.document_id:
+            try:
+                text = _safe_get_text(req.document_id)
+                if text:
+                    doc_summary = text2sentiment([text])[0]
+                    pol = float(getattr(doc_summary, 'textblob_polarity', 0.0))
+                    doc_score = float(pol)
+                    resolved_single = _resolve_doc_id(req.document_id) or req.document_id
+                    used_documents.append(resolved_single)
+                    dt = _doc_date_for_id(resolved_single)
+                    doc_breakdown.append({
+                        "id": resolved_single,
+                        "score": float(pol),
+                        "weight": 1.0,
+                        "date": dt.isoformat() if dt else None,
+                        "year": dt.year if dt else None,
+                    })
+                company = _company_from_doc_id(req.document_id)
+            except Exception as e:
+                logger.warning(f"Document sentiment failed for {req.document_id}: {e}")
+                doc_score = None
+
+        # 2) Determine ticker/company
+        ticker = (req.ticker or "").strip().upper()
+        if not ticker and company:
+            # Resolve ticker from company name via Yahoo Finance search (no hard-coded mapping)
+            try:
+                res = _resolve_ticker_for_company(company)
+                if res and res.get("symbol"):
+                    ticker = str(res["symbol"]).upper()
+            except Exception:
+                pass
+        if not company and ticker:
+            # Resolve company long name from ticker
+            try:
+                res = _resolve_ticker_for_company(ticker)
+                if res and res.get("name"):
+                    company = str(res["name"]).strip()
+                else:
+                    company = ticker
+            except Exception:
+                company = ticker
+
+        # Fallback: if no explicit document IDs but we have a company (e.g., user typed "apple"),
+        # auto-select that company's FinanceBench documents and compute doc sentiment.
+        if not used_documents and not req.document_ids and not req.document_id and company:
+            try:
+                comp_norm = _normalize_company(company)
+                candidate_ids = []
+                for key, meta in FINANCEBENCH_INDEX.items():
+                    comp = _normalize_company(str(meta.get("company", "")))
+                    if comp == comp_norm or comp_norm in comp or comp in comp_norm:
+                        candidate_ids.append(key)
+                if candidate_ids:
+                    pairs = [(did, _doc_date_for_id(did) or datetime(1970, 1, 1)) for did in candidate_ids]
+                    pairs.sort(key=lambda x: x[1], reverse=True)
+                    doc_ids_to_use = [p[0] for p in pairs[:12]]
+
+                    weighted_sum = 0.0
+                    total_w = 0.0
+                    for did in doc_ids_to_use:
+                        try:
+                            text = _safe_get_text(did)
+                            if not text:
+                                continue
+                            doc_summary = text2sentiment([text])[0]
+                            pol = float(getattr(doc_summary, 'textblob_polarity', 0.0))
+                            s = pol
+
+                            dt = _doc_date_for_id(did)
+                            if dt is not None:
+                                age_years = max(0.0, (datetime.utcnow() - dt).days / 365.25)
+                                w = 1.0 / (1.0 + age_years)
+                            else:
+                                w = 1.0
+
+                            weighted_sum += float(s) * w
+                            total_w += w
+
+                            resolved_id = _resolve_doc_id(did) or did
+                            used_documents.append(resolved_id)
+                            doc_breakdown.append({
+                                "id": resolved_id,
+                                "score": s,
+                                "weight": w,
+                                "date": dt.isoformat() if dt else None,
+                                "year": dt.year if dt else None,
+                            })
+                        except Exception:
+                            continue
+                    if total_w > 0 and doc_score is None:
+                        doc_score = float(weighted_sum / total_w)
+            except Exception:
+                pass
+
+        # 3) News sentiment (optional)
         if req.include_news and company:
             try:
                 news: NewsSentimentResult = analyze_company_news_sentiment(company, api_key=NEWS_API_KEY)
@@ -685,21 +883,15 @@ async def get_investment_recommendation(req: InvestmentRequest):
                 logger.warning(f"News sentiment failed: {e}")
                 news_score = None
 
-        # 3) Forecast (optional if ticker available)
-        ticker = (req.ticker or "").strip().upper()
-        if not ticker and company:
-            ticker = COMPANY_TICKERS.get(_normalize_company(company), "")
-        forecast_part = None
-        forecast_score = None
+        # 4) Forecast (optional if ticker available)
         if ticker:
             try:
                 fc = run_forecast(ticker=ticker, period=req.period, horizon=req.horizon, model=req.model)
                 last_price = float(fc.last_price)
                 last_pred = float(fc.predictions.iloc[-1]["pred"]) if not fc.predictions.empty else last_price
                 change_pct = 0.0 if last_price == 0 else (last_pred - last_price) / last_price
-                # Clamp to reasonable range
                 change_pct = max(-0.15, min(0.15, change_pct))
-                forecast_score = float(change_pct * 1.0)  # already roughly in [-0.15,0.15]
+                forecast_score = float(change_pct)
                 forecast_part = {
                     "ticker": fc.ticker,
                     "model": fc.model,
@@ -712,7 +904,7 @@ async def get_investment_recommendation(req: InvestmentRequest):
                 logger.warning(f"Forecast failed for {ticker}: {e}")
                 forecast_score = None
 
-        # 4) Combine scores
+        # 5) Combine scores with available weights
         weights = {"doc": 0.6, "news": 0.25, "forecast": 0.15}
         total_w = 0.0
         composite = 0.0
@@ -727,16 +919,16 @@ async def get_investment_recommendation(req: InvestmentRequest):
             total_w += weights["forecast"]
         composite = composite / total_w if total_w > 0 else 0.0
 
-        # 5) Decision thresholds
+        # 6) Decision thresholds
         action = "HOLD"
         if composite >= 0.15:
             action = "BUY"
         elif composite <= -0.15:
             action = "SELL"
 
+        # Confidence and risk level (cleaned; do not override action from news presence)
         confidence = float(min(1.0, max(0.0, abs(composite) * 1.5)))
 
-        # Risk level heuristic
         risk_level = "MEDIUM"
         mae_ratio = None
         if forecast_part and forecast_part.get("mae") and forecast_part.get("last_price"):
@@ -745,54 +937,136 @@ async def get_investment_recommendation(req: InvestmentRequest):
                 risk_level = "HIGH"
             elif mae_ratio < 0.03:
                 risk_level = "LOW"
-        # If news is very polarized, bump risk
         if news_part and news_part.get("overall"):
             overall = news_part["overall"]
             if overall.get("neutral", 0) < 0.3:
                 risk_level = "HIGH" if risk_level != "HIGH" else risk_level
 
-        # Reasoning string
-        reasoning_bits = [
-            f"Document sentiment score {doc_score:+.2f} (pos {pos:.2f} vs neg {neg:.2f})."
-        ]
+        reasoning_bits = []
+        if doc_score is not None:
+            reasoning_bits.append(f"Aggregated document sentiment score {doc_score:+.2f}.")
         if news_score is not None and news_part:
             overall = news_part["overall"]
             reasoning_bits.append(
-                f"News sentiment {news_score:+.2f} (pos {overall.get('positive',0):.2f}, neg {overall.get('negative',0):.2f}, {news_part.get('total_articles',0)} articles)."
+                f"News tone P/N/N = {overall.get('positive',0):.2f}/{overall.get('negative',0):.2f}/{overall.get('neutral',0):.2f}."
             )
-        if forecast_score is not None and forecast_part:
+        if forecast_part is not None:
             reasoning_bits.append(
-                f"Forecast implies {forecast_score*100:+.1f}% over {forecast_part.get('horizon_days', req.horizon)}d using {forecast_part.get('model','rf').upper()} (MAE {forecast_part.get('mae',0):.2f})."
+                f"Forecast suggests {forecast_score:+.2%} over {forecast_part['horizon_days']}d (model {forecast_part['model']}, MAE {forecast_part['mae']:.2f})."
             )
-        reasoning_bits.append(f"Composite score {composite:+.2f} → {action}.")
-        reasoning = " \n".join(reasoning_bits)
+        # If no documents were used, add explicit note about data sources used
+        if not used_documents:
+            sources = []
+            if news_score is not None:
+                sources.append("news sentiment")
+            if forecast_part is not None:
+                sources.append("price forecast")
+            src_text = " and ".join(sources) if sources else "available data"
+            subject = company or ticker or "this ticker"
+            reasoning_bits.append(f"No FinanceBench documents found for {subject}. Recommendation based on {src_text}.")
+        if not reasoning_bits:
+            reasoning_bits.append("Insufficient data; defaulting to HOLD.")
 
-        # Build response
-        target_price = forecast_part.get("target_price") if forecast_part else None
-        data = InvestmentRecommendation(
+        components: Dict[str, Any] = {
+            "doc_score": doc_score,
+            "news_score": news_score,
+            "forecast_score": forecast_score,
+            "forecast": forecast_part,
+            "used_documents": used_documents,
+        }
+        if doc_breakdown:
+            # Sort breakdown by date/year descending for convenience
+            try:
+                components["doc_breakdown"] = sorted(doc_breakdown, key=lambda d: (d.get("date") or ""), reverse=False)
+            except Exception:
+                components["doc_breakdown"] = doc_breakdown
+
+        return APIResponse(success=True, data=InvestmentRecommendation(
             action=action,
             confidence=confidence,
-            reasoning=reasoning,
-            target_price=target_price,
+            reasoning="\n".join(reasoning_bits),
+            target_price=forecast_part.get("target_price") if forecast_part else None,
             risk_level=risk_level,
-            components={
-                "doc_score": doc_score,
-                "news_score": news_score,
-                "forecast_score": forecast_score,
-                "composite": composite,
-                "company": company,
-                "ticker": ticker or None,
-                "news": news_part,
-                "forecast": forecast_part,
-            }
-        )
-        return APIResponse(success=True, data=data.dict())
-
+            components=components
+        ).dict())
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Investment recommendation error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate investment recommendation")
+        raise HTTPException(status_code=500, detail="Failed to compute investment recommendation")
+
+# --- Ticker/Company lookup utilities ---
+
+def _yahoo_search(query: str) -> Dict[str, Any]:
+    """Query Yahoo Finance search endpoint for symbols matching query."""
+    import json
+    import urllib.parse
+    import urllib.request
+
+    url = "https://query2.finance.yahoo.com/v1/finance/search?" + urllib.parse.urlencode({
+        "q": query,
+        "quotesCount": 10,
+        "newsCount": 0,
+    })
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        return data or {}
+
+
+def _resolve_ticker_for_company(name_or_symbol: str) -> Optional[Dict[str, Any]]:
+    """Resolve a company name or symbol to a best-match ticker using Yahoo search.
+    Returns dict with symbol, name, exchange if found.
+    """
+    q = (name_or_symbol or "").strip()
+    if not q:
+        return None
+    try:
+        # Try yfinance search if available (newer versions)
+        try:
+            import yfinance as yf  # type: ignore
+            if hasattr(yf, "search"):
+                res = yf.search(q)
+                quotes = res.get("quotes", []) if isinstance(res, dict) else []
+            else:
+                quotes = []
+        except Exception:
+            quotes = []
+        if not quotes:
+            res = _yahoo_search(q)
+            quotes = res.get("quotes", []) if isinstance(res, dict) else []
+        # Pick first equity-like result
+        for it in quotes:
+            sym = it.get("symbol")
+            longname = it.get("longname") or it.get("longName") or it.get("shortname") or it.get("shortName")
+            exch = it.get("exchDisp") or it.get("exchangeDisp") or it.get("exchange")
+            quote_type = (it.get("quoteType") or "").lower()
+            if sym and (quote_type in ("equity", "etf", "mutualfund", "index") or True):
+                return {"symbol": str(sym).upper(), "name": longname or sym, "exchange": exch}
+    except Exception:
+        return None
+    return None
+
+@app.get("/api/lookup", response_model=APIResponse)
+async def lookup_symbol(query: str):
+    """Lookup ticker symbol(s) by company name or symbol."""
+    try:
+        result = _resolve_ticker_for_company(query)
+        # Also return top candidates for potential UI use
+        candidates = []
+        try:
+            data = _yahoo_search(query)
+            for it in data.get("quotes", [])[:10]:
+                candidates.append({
+                    "symbol": it.get("symbol"),
+                    "name": it.get("longname") or it.get("longName") or it.get("shortname") or it.get("shortName"),
+                    "exchange": it.get("exchDisp") or it.get("exchangeDisp") or it.get("exchange"),
+                })
+        except Exception:
+            pass
+        return APIResponse(success=True, data={"query": query, "best": result, "candidates": candidates})
+    except Exception:
+        return APIResponse(success=False, error="Lookup failed")
 
 # Health check endpoint
 @app.get("/health")
@@ -800,13 +1074,46 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "documents_loaded": len(FINANCEBENCH_INDEX)}
 
-if __name__ == '__main__':
-    import uvicorn
-    port = int(os.environ.get('PORT', 5001))
-    uvicorn.run(
-        "app:app", 
-        host="0.0.0.0", 
-        port=port, 
-        reload=True,
-        log_level="info"
-    )
+def _candidate_pdf_paths(name: str) -> list:
+    """Generate candidate PDF paths for a given FinanceBench doc_name, trying common locations/cases."""
+    from pathlib import Path as _P
+    stem = _P(name).stem
+    # Try as-provided, lowercase, uppercase
+    names = [f"{stem}.pdf", f"{stem.lower()}.pdf", f"{stem.upper()}.pdf"]
+    roots = [PATH_PDFS_CWD, PATH_PDFS_GENERIC, PATH_PDFS_FB]
+    out = []
+    for root in roots:
+        for nm in names:
+            out.append(str((root / nm)))
+    return out
+
+
+def _safe_get_text(doc_id: str) -> str:
+    """Best-effort loader for a FinanceBench document by id, trying canonical, original doc_name,
+    and multiple file system case variants across known roots. Returns empty string on failure.
+    """
+    try:
+        resolved = _resolve_doc_id(doc_id) or doc_id
+        meta = FINANCEBENCH_INDEX.get(resolved) or {}
+        candidates = []
+        original = meta.get("doc_name")
+        if original:
+            candidates.append(str(original))
+            candidates.extend(_candidate_pdf_paths(original))
+        candidates.append(str(resolved))
+        candidates.extend(_candidate_pdf_paths(resolved))
+        seen = set()
+        for name in candidates:
+            key = name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                txt = get_text(name)
+                if txt:
+                    return txt
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return ""

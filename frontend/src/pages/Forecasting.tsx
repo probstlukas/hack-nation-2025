@@ -287,9 +287,11 @@ const Forecasting: React.FC = () => {
                 <label className="form-label inline-flex items-center gap-1">
                   Period
                 </label>
-                <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
-                  {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
+                <div className="select-wrap">
+                  <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
+                    {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
                 <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">History window used for training and chart context.</div>
               </div>
 
@@ -305,9 +307,11 @@ const Forecasting: React.FC = () => {
                 <label className="form-label inline-flex items-center gap-1">
                   Model
                 </label>
-                <select className="form-input" value={model} onChange={(e)=>setModel(e.target.value)}>
-                  {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
+                <div className="select-wrap">
+                  <select className="form-input" value={model} onChange={(e)=>setModel(e.target.value)}>
+                    {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                </div>
                 <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">Choose RF, Prophet, or LSTM.</div>
               </div>
 

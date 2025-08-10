@@ -259,19 +259,42 @@ a.card:hover {
   color: #6b7280;
 }
 
-/* Select Dropdown Enhancement */
-select.form-input {
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.75rem center;
-  background-repeat: no-repeat;
-  background-size: 1rem 1rem;
-  padding-right: 3rem;
+/* Styled select wrapper with custom arrow (no duplicate arrows) */
+.select-wrap { position: relative; display: block; }
+.select-wrap select.form-input {
   appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.5rem; /* room for arrow */
+}
+.select-wrap::after {
+  content: '';
+  position: absolute;
+  right: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid #6b7280; /* gray-500 */
+  pointer-events: none;
+}
+.select-wrap:hover::after { border-top-color: #2563eb; }
+.select-wrap:focus-within::after { border-top-color: #2563eb; }
+
+/* Remove iOS inner shadow/arrow overlap */
+select.form-input::-ms-expand {
+  display: none;
 }
 
+/* Fix duplicate arrows in some browsers */
+select.form-input::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+
+/* Ensure hover does not re-introduce a background image */
 select.form-input:hover {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-image: none !important;
 }
 
 /* Textarea Enhancement */

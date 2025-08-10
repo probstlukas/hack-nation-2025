@@ -169,55 +169,61 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Company */}
-            <select
-              className="form-input"
-              value={selectedCompany}
-              onChange={(e) => {
-                setSelectedCompany(e.target.value);
-                setSelectedYear('');
-                setSelectedType('');
-              }}
-            >
-              <option value="">All Companies</option>
-              {getUniqueCompanies().map((company) => (
-                <option key={company} value={company}>
-                  {company}
-                </option>
-              ))}
-            </select>
+            <div className="select-wrap">
+              <select
+                className="form-input"
+                value={selectedCompany}
+                onChange={(e) => {
+                  setSelectedCompany(e.target.value);
+                  setSelectedYear('');
+                  setSelectedType('');
+                }}
+              >
+                <option value="">All Companies</option>
+                {getUniqueCompanies().map((company) => (
+                  <option key={company} value={company}>
+                    {company}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Year */}
-            <select
-              className="form-input"
-              value={selectedYear}
-              onChange={(e) => {
-                setSelectedYear(e.target.value);
-                setSelectedType('');
-              }}
-              disabled={!selectedCompany && getUniqueYears().length === 0}
-            >
-              <option value="">All Years</option>
-              {getUniqueYears().map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+            <div className="select-wrap">
+              <select
+                className="form-input"
+                value={selectedYear}
+                onChange={(e) => {
+                  setSelectedYear(e.target.value);
+                  setSelectedType('');
+                }}
+                disabled={!selectedCompany && getUniqueYears().length === 0}
+              >
+                <option value="">All Years</option>
+                {getUniqueYears().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Type */}
-            <select
-              className="form-input"
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              disabled={getUniqueTypes().length === 0}
-            >
-              <option value="">All Types</option>
-              {getUniqueTypes().map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+            <div className="select-wrap">
+              <select
+                className="form-input"
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                disabled={getUniqueTypes().length === 0}
+              >
+                <option value="">All Types</option>
+                {getUniqueTypes().map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Error State */}

@@ -123,6 +123,7 @@ The project uses the bundled **FinanceBench** dataset containing:
 - **Document Viewer**: Read full document text
 - **Q&A Chat Interface**: Ask questions about any document
 - **Financial Metrics Extraction**: Automatic revenue, profit analysis via Q&A
+  - Note: For newly opened documents, the first query may take longer or fail as the system generates the vector database for retrieval. This is a one-time process per document. Wait about a minute, then try again.
 - **Sentiment Analysis**: Market sentiment from financial text
 - **Responsive Design**: Works on desktop and mobile
 

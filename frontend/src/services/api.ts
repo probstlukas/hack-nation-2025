@@ -128,6 +128,16 @@ export const apiService = {
     return response.data.data as unknown as InvestmentRecommendation;
   },
 
+  // Lookup symbol/company via backend
+  async lookupSymbol(query: string): Promise<{ query: string; best?: { symbol?: string; name?: string; exchange?: string }; candidates: Array<{ symbol?: string; name?: string; exchange?: string }>; }> {
+    const response = await api.get<ApiResponse<any>>(`/api/lookup?query=${encodeURIComponent(query)}`);
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Lookup failed');
+    }
+    const d = (response.data.data || {}) as any;
+    return { query: d.query, best: d.best, candidates: d.candidates || [] };
+  },
+
   // Health check
   async healthCheck(): Promise<any> {
     const response = await api.get('/');

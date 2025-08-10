@@ -77,6 +77,17 @@ const HowToUse: React.FC = () => {
             </ul>
           </div>
         </div>
+
+        <div className="card mt-6">
+          <div className="card-header">
+            <h3 className="font-semibold">Notes</h3>
+          </div>
+          <div className="card-body text-sm text-slate-700 space-y-2">
+            <ul className="list-disc pl-4 space-y-1">
+              <li>You can enter just a ticker in Investment Strategy. We automatically match a FinanceBench document for that company when available (e.g., APPL is corrected to AAPL → Apple). If no document is found, the recommendation uses market data and news only.</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

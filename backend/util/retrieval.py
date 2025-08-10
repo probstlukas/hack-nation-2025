@@ -102,7 +102,9 @@ def answer_question(doc_id: str, question: str, top_k: int = 4) -> Dict[str, Any
         if len(history_list) == 0:
             history = None
         else:
-            history = "\n".join(history_list)
+            history = "High quality fragments (previous answers)" + "\n".join(
+                history_list
+            )
         answer = answer_question_openai(
             question, doc_path, top_k + i, extra_contex=history
         )

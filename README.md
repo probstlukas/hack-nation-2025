@@ -66,7 +66,7 @@ This project implements a comprehensive 3-stage AI system for financial analysis
 
 2. Create a conda environment (optional)
     ```
-    conda create -n hack-nation python=3.10
+    conda create -n hack-nation python=3.10 -y
     ```
 
 3. **Run the start script**

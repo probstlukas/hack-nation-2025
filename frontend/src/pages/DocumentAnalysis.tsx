@@ -171,7 +171,7 @@ const DocumentAnalysis: React.FC = () => {
   }
 
   const quickQuestions = [
-    "What is the company's revenue for this period?",
+    "What is the company's revenue for this period for the individual quarters?",
     "What are the main business risks? How is the company's cash flow?",
     "What are the key business segments?"
   ];

@@ -32,12 +32,16 @@ def answer_question_openai(
     query_result = vector_db.query(
         query_embeddings=[response.data[0].embedding], n_results=top_k
     )["documents"][0]
-    context = "Document Fragement:\n".join(query_result)
+    context = (
+        "Previous high-quality responses (look in here for answers first):\n".join(
+            query_result
+        )
+    )
 
     if extra_contex is not None:
         context = extra_contex + "\n" + context
 
-    promt = f"Please serve the promt '{query}' based one of the following document fragments (the answer is probably in there): Context: {context}"
+    promt = f"Please answer the question '{query}' based one of the following document fragments (the answer is probably in there): Context: {context}"
 
     print(context)
 

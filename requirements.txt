@@ -1,7 +1,14 @@
 # PDF text extraction
 PyMuPDF>=1.24.0
 
+
 # text2sentiment
 textblob
 transformers
 accelerate
+
+# Q&A
+langchain_community
+langchain
+pdfplumber
+pandas

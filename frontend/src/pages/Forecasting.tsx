@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, BrainCircuit, ExternalLink, HelpCircle } from 'lucide-react';
 import { apiService } from '../services/api';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend, Brush } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, ReferenceLine, Legend, Brush, AreaChart, Area } from 'recharts';
 
 const periods = [
   { label: '1y', value: '1y' },
@@ -12,16 +12,17 @@ const periods = [
 ];
 
 const modelOptions = [
+  { label: 'LSTM', value: 'lstm' },
   { label: 'RandomForest', value: 'rf' },
   { label: 'Prophet', value: 'prophet' },
-  { label: 'LSTM', value: 'lstm' },
+  
 ];
 
 const Forecasting: React.FC = () => {
   const [ticker, setTicker] = useState('AAPL');
   const [period, setPeriod] = useState('5y');
   const [horizon, setHorizon] = useState(5);
-  const [model, setModel] = useState('rf');
+  const [model, setModel] = useState('lstm');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any | null>(null);
@@ -100,49 +101,41 @@ const Forecasting: React.FC = () => {
           <div className="card-body">
             <div className="grid md:grid-cols-5 gap-4">
               <div>
-                <label className="form-label">Ticker</label>
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <label className="form-label"> Ticker</label>
                 <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  
                   <input className="form-input pl-9" placeholder="AAPL, NVDA, MSFT" value={ticker} onChange={(e)=>setTicker(e.target.value)} />
                 </div>
-                <div className="text-xs text-slate-500 mt-1">Public market symbol (case-insensitive).</div>
+                <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">Public market symbol (case-insensitive).</div>
               </div>
 
               <div>
                 <label className="form-label inline-flex items-center gap-1">
                   Period
-                  <span title="How much history to load. Used for model training and shown on the chart.">
-                    <HelpCircle size={14} className="text-gray-400" />
-                  </span>
                 </label>
                 <select className="form-input" value={period} onChange={(e)=>setPeriod(e.target.value)}>
                   {periods.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
-                <div className="text-xs text-slate-500 mt-1">History window used for training and chart context.</div>
+                <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">History window used for training and chart context.</div>
               </div>
 
               <div>
                 <label className="form-label inline-flex items-center gap-1">
                   Horizon (days)
-                  <span title="How many future trading days to predict.">
-                    <HelpCircle size={14} className="text-gray-400" />
-                  </span>
                 </label>
                 <input className="form-input" type="number" min={1} max={30} value={horizon} onChange={(e)=>setHorizon(parseInt(e.target.value||'5'))} />
-                <div className="text-xs text-slate-500 mt-1">Forecast length (future trading days).</div>
+                <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">Forecast length (future trading days).</div>
               </div>
 
               <div>
                 <label className="form-label inline-flex items-center gap-1">
                   Model
-                  <span title="Algorithm used to forecast. Prophet may take longer on first run (CmdStan compile). LSTM trains a small neural net.">
-                    <HelpCircle size={14} className="text-gray-400" />
-                  </span>
                 </label>
                 <select className="form-input" value={model} onChange={(e)=>setModel(e.target.value)}>
                   {modelOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
-                <div className="text-xs text-slate-500 mt-1">Choose RF, Prophet, or LSTM.</div>
+                <div style={{fontSize: 12, color: 'grey'}} className="text-xs text-slate-500 mt-1">Choose RF, Prophet, or LSTM.</div>
               </div>
 
               <div className="flex items-end">
@@ -177,14 +170,31 @@ const Forecasting: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
-                      <Tooltip />
+                      <RechartsTooltip />
                       <Legend />
                       <Line dataKey="close" name="History" stroke="#0ea5e9" strokeWidth={2} dot={false} connectNulls />
                       {combinedData.lastDate && (
                         <ReferenceLine x={combinedData.lastDate} stroke="#94a3b8" strokeDasharray="3 3" />
                       )}
                       <Line dataKey="pred" name="Forecast" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
-                      <Brush dataKey="date" height={24} travellerWidth={8} className="mt-2" />
+                      <Brush
+                        dataKey="date"
+                        height={40}
+                        travellerWidth={10}
+                        stroke="#cbd5e1"
+                        fill="#f8fafc"
+                        className="mt-2"
+                      >
+                        <AreaChart data={combinedData.merged}>
+                          <defs>
+                            <linearGradient id="brushColor" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.8} />
+                              <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.2} />
+                            </linearGradient>
+                          </defs>
+                          <Area type="monotone" dataKey="close" stroke="#94a3b8" fill="url(#brushColor)" fillOpacity={1} dot={false} />
+                        </AreaChart>
+                      </Brush>
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (

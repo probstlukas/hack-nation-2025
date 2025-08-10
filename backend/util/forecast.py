@@ -114,27 +114,37 @@ def prophet_forecast(prices: pd.DataFrame, horizon: int = 5) -> Dict[str, Any]:
   if not _HAS_PROPHET:
     raise RuntimeError("prophet not installed")
   df = prices.rename(columns={"date": "ds", "close": "y"})
-  # Simple train/holdout for MAE
+  # Holdout for MAE computation
   holdout = min(max(horizon, 5), 30)
   train_df = df.iloc[:-holdout].copy() if len(df) > holdout else df.copy()
+
+  # Model for MAE on holdout
   m = Prophet(daily_seasonality=True, weekly_seasonality=True, yearly_seasonality=True)
   try:
     m.fit(train_df)
   except Exception:
-    # Try installing cmdstan and retry
     _ensure_cmdstan_installed()
     m.fit(train_df)
-  future = m.make_future_dataframe(periods=horizon)
-  fcst = m.predict(future)
-  # Extract only forecast tail
-  tail = fcst.tail(horizon)
-  preds = tail[["ds", "yhat"]].rename(columns={"ds": "date", "yhat": "pred"}).copy()
-  # MAE on holdout if available
+
   if len(df) > holdout:
     hold_future = m.predict(df[["ds"]].iloc[-holdout:])
     mae = float(mean_absolute_error(df["y"].iloc[-holdout:], hold_future["yhat"].iloc[-holdout:]))
   else:
     mae = float("nan")
+
+  # Separate model trained on full data to forecast strictly after the last historical date
+  m_full = Prophet(daily_seasonality=True, weekly_seasonality=True, yearly_seasonality=True)
+  try:
+    m_full.fit(df)
+  except Exception:
+    _ensure_cmdstan_installed()
+    m_full.fit(df)
+
+  future_full = m_full.make_future_dataframe(periods=horizon)
+  fcst_full = m_full.predict(future_full)
+  tail = fcst_full.tail(horizon)
+  preds = tail[["ds", "yhat"]].rename(columns={"ds": "date", "yhat": "pred"}).copy()
+
   return {"preds": preds, "mae": mae}
 
 
@@ -174,17 +184,31 @@ def lstm_forecast(prices: pd.DataFrame, horizon: int = 5, window: int = 20) -> D
   val_pred = model.predict(X_val, verbose=0)
   mae = float(np.mean(np.abs(val_pred - y_val)))
 
-  # Forecast next horizon iteratively
+  # Forecast next horizon iteratively, anchored to last observed close to avoid jumps
   last_seq = data_s[-window:].copy()
   preds = []
   last_date = prices["date"].iloc[-1]
+  last_close = float(prices["close"].iloc[-1])
+  anchor_offset_abs: Optional[float] = None
+  anchor_offset_s: Optional[float] = None
   for _ in range(horizon):
     yhat_s = float(model.predict(last_seq.reshape(1, window, 1), verbose=0)[0, 0])
     yhat = yhat_s * rng + min_v
+
+    # On first step, compute offset so first prediction matches last_close
+    if anchor_offset_abs is None:
+      anchor_offset_abs = last_close - yhat
+      anchor_offset_s = anchor_offset_abs / rng if rng != 0 else 0.0
+
+    # Apply offset to keep continuity
+    yhat_s_adj = yhat_s + (anchor_offset_s or 0.0)
+    yhat_adj = yhat + (anchor_offset_abs or 0.0)
+
     last_date = last_date + pd.Timedelta(days=1)
-    preds.append({"date": last_date, "pred": float(yhat)})
-    # Update sequence
-    last_seq = np.concatenate([last_seq[1:], np.array([[yhat_s]], dtype="float32")], axis=0)
+    preds.append({"date": last_date, "pred": float(yhat_adj)})
+
+    # Feed adjusted normalized value back into sequence
+    last_seq = np.concatenate([last_seq[1:], np.array([[yhat_s_adj]], dtype="float32")], axis=0)
 
   return {"preds": pd.DataFrame(preds), "mae": mae}
 

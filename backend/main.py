@@ -7,6 +7,12 @@ the AkashX.ai challenge requirements. Frontend is a separate React app.
 """
 import os
 import asyncio
+# Load .env early so environment variables are available
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
 import random
 import time
 from pathlib import Path
@@ -37,6 +43,12 @@ from backend.util.news_sentiment import analyze_company_news_sentiment, NewsSent
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Environment variables
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
+if not NEWS_API_KEY:
+    logger = logging.getLogger(__name__)
+    logger.warning("NEWS_API_KEY is not set; news sentiment features may be disabled.")
 
 # Pydantic models for request/response validation
 class FinancialMetrics(BaseModel):
@@ -82,12 +94,53 @@ class APIResponse(BaseModel):
     error: Optional[str] = None
     message: Optional[str] = None
 
-# Global variables for caching
-FINANCEBENCH_INDEX = {}
-DOCUMENT_CACHE = {}
+class InvestmentRecommendation(BaseModel):
+    action: str
+    confidence: float
+    reasoning: str
+    target_price: Optional[float] = None
+    risk_level: str = "MEDIUM"
+    components: Optional[Dict[str, Any]] = None
 
-# NewsAPI configuration
-NEWS_API_KEY = "6979aad5e683411b9316510e0dd423e7"
+class InvestmentRequest(BaseModel):
+    document_id: str = Field(..., description="ID of the FinanceBench document")
+    ticker: Optional[str] = Field(None, description="Optional market ticker to run forecast (e.g. AAPL)")
+    period: str = Field("5y", description="History period for forecast")
+    horizon: int = Field(5, ge=1, le=30, description="Forecast horizon in trading days")
+    model: str = Field("lstm", description="Forecast model: rf|prophet|lstm")
+    include_news: bool = Field(True, description="Include recent news sentiment")
+
+# Heuristic company->ticker mapping (extend as needed)
+COMPANY_TICKERS = {
+    "3M": "MMM",
+    "AMAZON": "AMZN",
+    "ADOBE": "ADBE",
+    "AES": "AES",
+    "AMCOR": "AMCR",
+    "APPLE": "AAPL",
+    "MICROSOFT": "MSFT",
+    "NVIDIA": "NVDA",
+    "TESLA": "TSLA",
+    "INTEL": "INTC",
+    "IBM": "IBM",
+}
+
+def _company_from_doc_id(doc_id: str) -> str:
+    try:
+        meta = FINANCEBENCH_INDEX.get(doc_id) or {}
+        company = meta.get("company")
+        if company:
+            return str(company)
+    except Exception:
+        pass
+    try:
+        name, _year = parse_stock_and_year(doc_id)
+        return name
+    except Exception:
+        return ""
+
+def _normalize_company(name: str) -> str:
+    return str(name or "").replace("_", " ").replace("-", " ").strip().upper()
 
 async def initialize_app():
     """Initialize the application by loading FinanceBench index"""
@@ -571,7 +624,7 @@ async def ask_question(request: QARequest):
 
 # Stage 2 & 3 placeholder endpoints
 @app.post("/api/forecast", response_model=APIResponse)
-async def create_forecast(ticker: str = Query(..., min_length=1), period: str = Query("5y"), horizon: int = Query(5, ge=1, le=30), model: str = Query("rf", description="Model to use: rf|prophet|lstm")):
+async def create_forecast(ticker: str = Query(..., min_length=1), period: str = Query("5y"), horizon: int = Query(5, ge=1, le=30), model: str = Query("lstm", description="Model to use: rf|prophet|lstm")):
     """Run a lightweight price forecasting pipeline using selectable model.
 
     rf: RandomForestRegressor (default)
@@ -595,13 +648,151 @@ async def create_forecast(ticker: str = Query(..., min_length=1), period: str = 
         raise HTTPException(status_code=500, detail="Failed to generate forecast")
 
 @app.post("/api/investment-recommendation", response_model=APIResponse)
-async def get_investment_recommendation():
-    """Placeholder for investment recommendation functionality"""
-    return APIResponse(
-        success=False, 
-        message='Investment strategy feature coming soon in Stage 3!',
-        data={'stage': 3}
-    )
+async def get_investment_recommendation(req: InvestmentRequest):
+    """Compute an investment recommendation by combining:
+    - Document sentiment (Stage 1)
+    - Optional recent news sentiment
+    - Optional price forecast (Stage 2)
+    Returns BUY/SELL/HOLD with confidence, reasoning, and optional target price.
+    """
+    try:
+        # 1) Document sentiment
+        text = get_text(req.document_id)
+        if not text:
+            raise HTTPException(status_code=404, detail="Document text not found")
+        doc_summary = text2sentiment([text])[0]
+        # Convert to scores
+        pos = max(0.0, float(doc_summary.pos)) if hasattr(doc_summary, 'pos') else max(0.0, float(doc_summary.textblob_pos if hasattr(doc_summary, 'textblob_pos') else 0))
+        neg = max(0.0, float(doc_summary.neg)) if hasattr(doc_summary, 'neg') else max(0.0, float(doc_summary.textblob_neg if hasattr(doc_summary, 'textblob_neg') else 0))
+        doc_score = float(pos - neg)  # [-1,1] approx
+
+        # 2) News sentiment (optional)
+        company = _company_from_doc_id(req.document_id)
+        news_part = None
+        news_score = None
+        if req.include_news and company:
+            try:
+                news: NewsSentimentResult = analyze_company_news_sentiment(company, api_key=NEWS_API_KEY)
+                overall = news.overall_sentiment or {"positive": 0, "neutral": 1, "negative": 0}
+                news_score = float(overall.get("positive", 0) - overall.get("negative", 0))
+                news_part = {
+                    "company": company,
+                    "total_articles": news.total_articles,
+                    "overall": overall,
+                    "summary": news.summary,
+                }
+            except Exception as e:
+                logger.warning(f"News sentiment failed: {e}")
+                news_score = None
+
+        # 3) Forecast (optional if ticker available)
+        ticker = (req.ticker or "").strip().upper()
+        if not ticker and company:
+            ticker = COMPANY_TICKERS.get(_normalize_company(company), "")
+        forecast_part = None
+        forecast_score = None
+        if ticker:
+            try:
+                fc = run_forecast(ticker=ticker, period=req.period, horizon=req.horizon, model=req.model)
+                last_price = float(fc.last_price)
+                last_pred = float(fc.predictions.iloc[-1]["pred"]) if not fc.predictions.empty else last_price
+                change_pct = 0.0 if last_price == 0 else (last_pred - last_price) / last_price
+                # Clamp to reasonable range
+                change_pct = max(-0.15, min(0.15, change_pct))
+                forecast_score = float(change_pct * 1.0)  # already roughly in [-0.15,0.15]
+                forecast_part = {
+                    "ticker": fc.ticker,
+                    "model": fc.model,
+                    "mae": fc.mae,
+                    "last_price": last_price,
+                    "target_price": last_pred,
+                    "horizon_days": fc.horizon_days,
+                }
+            except Exception as e:
+                logger.warning(f"Forecast failed for {ticker}: {e}")
+                forecast_score = None
+
+        # 4) Combine scores
+        weights = {"doc": 0.6, "news": 0.25, "forecast": 0.15}
+        total_w = 0.0
+        composite = 0.0
+        if doc_score is not None:
+            composite += weights["doc"] * doc_score
+            total_w += weights["doc"]
+        if news_score is not None:
+            composite += weights["news"] * news_score
+            total_w += weights["news"]
+        if forecast_score is not None:
+            composite += weights["forecast"] * forecast_score
+            total_w += weights["forecast"]
+        composite = composite / total_w if total_w > 0 else 0.0
+
+        # 5) Decision thresholds
+        action = "HOLD"
+        if composite >= 0.15:
+            action = "BUY"
+        elif composite <= -0.15:
+            action = "SELL"
+
+        confidence = float(min(1.0, max(0.0, abs(composite) * 1.5)))
+
+        # Risk level heuristic
+        risk_level = "MEDIUM"
+        mae_ratio = None
+        if forecast_part and forecast_part.get("mae") and forecast_part.get("last_price"):
+            mae_ratio = float(forecast_part["mae"]) / max(1e-9, float(forecast_part["last_price"]))
+            if mae_ratio > 0.06:
+                risk_level = "HIGH"
+            elif mae_ratio < 0.03:
+                risk_level = "LOW"
+        # If news is very polarized, bump risk
+        if news_part and news_part.get("overall"):
+            overall = news_part["overall"]
+            if overall.get("neutral", 0) < 0.3:
+                risk_level = "HIGH" if risk_level != "HIGH" else risk_level
+
+        # Reasoning string
+        reasoning_bits = [
+            f"Document sentiment score {doc_score:+.2f} (pos {pos:.2f} vs neg {neg:.2f})."
+        ]
+        if news_score is not None and news_part:
+            overall = news_part["overall"]
+            reasoning_bits.append(
+                f"News sentiment {news_score:+.2f} (pos {overall.get('positive',0):.2f}, neg {overall.get('negative',0):.2f}, {news_part.get('total_articles',0)} articles)."
+            )
+        if forecast_score is not None and forecast_part:
+            reasoning_bits.append(
+                f"Forecast implies {forecast_score*100:+.1f}% over {forecast_part.get('horizon_days', req.horizon)}d using {forecast_part.get('model','rf').upper()} (MAE {forecast_part.get('mae',0):.2f})."
+            )
+        reasoning_bits.append(f"Composite score {composite:+.2f} → {action}.")
+        reasoning = " \n".join(reasoning_bits)
+
+        # Build response
+        target_price = forecast_part.get("target_price") if forecast_part else None
+        data = InvestmentRecommendation(
+            action=action,
+            confidence=confidence,
+            reasoning=reasoning,
+            target_price=target_price,
+            risk_level=risk_level,
+            components={
+                "doc_score": doc_score,
+                "news_score": news_score,
+                "forecast_score": forecast_score,
+                "composite": composite,
+                "company": company,
+                "ticker": ticker or None,
+                "news": news_part,
+                "forecast": forecast_part,
+            }
+        )
+        return APIResponse(success=True, data=data.dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Investment recommendation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate investment recommendation")
 
 # Health check endpoint
 @app.get("/health")

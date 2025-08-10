@@ -92,7 +92,7 @@ export const apiService = {
     const ticker = (request as any).ticker || '';
     const period = (request as any).period || '5y';
     const horizon = (request as any).horizon ?? (request as any).forecast_periods ?? 5;
-    const model = (request as any).model || 'rf';
+    const model = (request as any).model || 'lstm';
     if (!ticker) throw new Error('ticker is required');
     const url = `/api/forecast?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}&horizon=${encodeURIComponent(String(horizon))}&model=${encodeURIComponent(model)}`;
     const response = await api.post<ApiResponse<any>>(url);
@@ -108,16 +108,24 @@ export const apiService = {
     return response.data.data.news_sentiment;
   },
 
-  // Stage 3: Investment Strategy (placeholders)
-  async getInvestmentRecommendation(documentId: string): Promise<InvestmentRecommendation> {
+  // Stage 3: Investment Strategy
+  async getInvestmentRecommendation(request: { document_id: string; ticker?: string; period?: string; horizon?: number; model?: string; include_news?: boolean; }): Promise<InvestmentRecommendation> {
+    const payload = {
+      document_id: request.document_id,
+      ticker: request.ticker,
+      period: request.period ?? '5y',
+      horizon: request.horizon ?? 5,
+      model: request.model ?? 'lstm',
+      include_news: request.include_news ?? true,
+    };
     const response = await api.post<ApiResponse<InvestmentRecommendation>>(
       '/api/investment-recommendation',
-      { document_id: documentId }
+      payload
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.error || 'Failed to get investment recommendation');
     }
-    return response.data.data;
+    return response.data.data as unknown as InvestmentRecommendation;
   },
 
   // Health check

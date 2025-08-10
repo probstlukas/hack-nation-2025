@@ -361,11 +361,6 @@ class NewsSentimentAnalyzer:
         summary = f"""
         Based on analysis of {total_articles} recent news articles, sentiment towards {company_name} is {tone}.
         
-        Sentiment breakdown:
-        • Positive: {positive_pct:.1f}%
-        • Neutral: {neutral_pct:.1f}%  
-        • Negative: {negative_pct:.1f}%
-        
         Recent trend appears {recent_trend} based on the latest articles.
         """.strip()
         
@@ -390,22 +385,3 @@ def analyze_company_news_sentiment(
     """
     analyzer = NewsSentimentAnalyzer(api_key)
     return analyzer.analyze_company_sentiment(company_name, days_back)
-
-# Example usage
-if __name__ == "__main__":
-    # Test with your API key
-    API_KEY = "6979aad5e683411b9316510e0dd423e7"
-    
-    # Analyze a specific company
-    result = analyze_company_news_sentiment("Apple", API_KEY, days_back=7)
-    
-    print(f"Company: {result.company}")
-    print(f"Articles analyzed: {result.total_articles}")
-    print(f"Overall sentiment: {result.overall_sentiment}")
-    print(f"Summary: {result.summary}")
-    
-    # Print recent articles
-    for article in result.articles[:3]:
-        print(f"\nTitle: {article.title}")
-        print(f"Sentiment: {article.sentiment_label} ({article.sentiment_score:.3f})")
-        print(f"Published: {article.published_at.strftime('%Y-%m-%d %H:%M')}")

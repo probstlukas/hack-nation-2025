@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Home, TrendingUp, Target } from 'lucide-react';
+import { BarChart3, Home, TrendingUp, Target, HelpCircle } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const location = useLocation();
@@ -9,6 +9,7 @@ const Navbar: React.FC = () => {
     { path: '/', label: 'Dashboard', icon: Home },
     { path: '/forecasting', label: 'Forecasting', icon: TrendingUp },
     { path: '/investment-strategy', label: 'Investment Strategy', icon: Target },
+    { path: '/how-to-use', label: 'How to Use', icon: HelpCircle },
   ];
 
   return (

@@ -10,75 +10,81 @@ An AI-powered platform for financial document analysis and investment strategy d
 This project implements a comprehensive 3-stage AI system for financial analysis:
 
 ### Stage 1: Insights & Analysis (Document Q&A) ✅
-- **Status**: **IMPLEMENTED**
+- Status: IMPLEMENTED
 - Process financial documents and extract key insights
 - Natural language Q&A interface for document analysis
-- Market sentiment analysis and anomaly detection
-- Support for 10-K, 10-Q, 8-K, and earnings reports
+- Sentiment analysis for overall and key sections
 
-### Stage 2: Financial Forecasting 🚧
-- **Status**: Coming Soon
-- Predict future financial trends and market performance
-- External data integration (Yahoo Finance, Quandl, Alpha Vantage)
-- Advanced forecasting models for stock movements and earnings
+### Stage 2: Financial Forecasting ✅
+- Status: IMPLEMENTED (baseline + Prophet/LSTM optional)
+- Predict near‑term price movements using historical data
+- Model options: RandomForest (default), Prophet, LSTM
+- Interactive chart with zoom and overlays
 
-### Stage 3: Investment Strategy & Decision-Making 🚧
-- **Status**: Coming Soon
-- Generate actionable buy/sell recommendations
-- Risk-adjusted portfolio optimization
-- Strategic decision support with clear reasoning
+### Stage 3: Investment Strategy & Decision-Making ✅
+- Status: IMPLEMENTED (initial)
+- Generate actionable Buy/Sell/Hold with confidence and risk
+- Combines document sentiment, optional news sentiment, and forecast
+- UI live at /investment-strategy
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   React Frontend │    │   Flask API      │    │  FinanceBench   │
-│   (TypeScript)   │◄──►│   Backend        │◄──►│   Dataset       │
-│                 │    │                  │    │   (PDFs + Q&A)  │
+│ React Frontend  │    │ FastAPI Backend  │    │  FinanceBench   │
+│ (TypeScript)    │◄──►│  (Python)        │◄──►│  Dataset (PDFs) │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
-
-**Frontend**: Modern React TypeScript application with responsive design
-**Backend**: Flask API with PDF processing and mock Q&A system
-**Dataset**: FinanceBench financial documents and Q&A examples
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.8+ with pip
-- Node.js 16+ with npm
-- Git
+- Python 3.10+
+- Node.js 18+
 
-### 1. Clone and Setup Backend
+### 1) Start Backend
+- Create a `.env` in repo root (or export in shell):
+  - NEWS_API_KEY=your_key
+  - PORT=5001 (optional)
+- Run server:
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd hack-nation-2025
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Start the Flask API server
-python app.py
+./start.sh
 ```
 
-The API server will be available at `http://localhost:5000`
+Backend runs at http://localhost:5001 (FastAPI docs at /docs).
 
-### 2. Setup Frontend
+### 2) Start Frontend
+- Optional `frontend/.env`:
+  - REACT_APP_API_URL=http://localhost:5001
+- From frontend/:
 
 ```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install dependencies
 npm install
-
-# Start the React development server
 npm start
 ```
 
-The frontend will be available at `http://localhost:3000`
+App runs at http://localhost:3000.
+
+## 📚 Key Routes
+- /              Dashboard
+- /document/:id  Document Analysis (Q&A, PDF, Sentiment)
+- /forecasting   Forecasting (RF/Prophet/LSTM)
+- /investment-strategy  Investment Strategy (Stage 3 UI)
+
+## 🧠 APIs (selected)
+- GET /api/documents
+- GET /api/documents/{id}
+- GET /api/documents/{id}/text
+- GET /api/documents/{id}/sentiment
+- GET /api/companies/{company}/news-sentiment
+- POST /api/forecast?ticker=...&period=...&horizon=...&model=...
+- POST /api/investment-recommendation
+
+## Notes
+- News sentiment requires NEWS_API_KEY set; otherwise that part is skipped.
+- Prophet/LSTM paths are optional and may take longer on first use.
+- PDFs are served inline via /api/documents/:id/pdf.
 
 ## 📊 Dataset
 
@@ -132,8 +138,8 @@ The project uses the **FinanceBench** dataset containing:
 - **Custom CSS** with modern design system
 
 ### Backend
-- **Flask** web framework
-- **Flask-CORS** for cross-origin requests
+- **FastAPI** web framework
+- **CORS** for cross-origin requests
 - **PyMuPDF** for PDF text extraction
 - **LangChain** for document processing
 - **NLTK** for sentiment analysis
@@ -150,7 +156,7 @@ The project uses the **FinanceBench** dataset containing:
 
 ```
 hack-nation-2025/
-├── app.py                 # Flask API backend
+├── app.py                 # FastAPI backend
 ├── requirements.txt       # Python dependencies
 ├── util/
 │   └── pdf2text.py       # PDF processing utilities

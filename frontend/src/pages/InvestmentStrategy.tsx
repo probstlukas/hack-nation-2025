@@ -1,208 +1,108 @@
-import React from 'react';
-import { Target, TrendingUp, Shield, DollarSign, ArrowRight, Briefcase } from 'lucide-react';
+import React, { useState } from 'react';
+import { BrainCircuit, Target, TrendingUp, Shield, Loader2 } from 'lucide-react';
+import { apiService } from '../services/api';
+import { InvestmentRecommendation } from '../types';
 
 const InvestmentStrategy: React.FC = () => {
+  const [docId, setDocId] = useState('');
+  const [ticker, setTicker] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rec, setRec] = useState<InvestmentRecommendation | null>(null);
+
+  const run = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docId.trim()) return;
+    try {
+      setLoading(true);
+      setError(null);
+      setRec(null);
+      const data = await apiService.getInvestmentRecommendation({ document_id: docId.trim(), ticker: ticker.trim() || undefined });
+      setRec(data);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to get recommendation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-        <div className="container mx-auto px-6 py-16">
-          <div className="text-center">
-            <Target size={64} className="mx-auto mb-4" />
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Investment Strategy & Decision-Making
-            </h1>
-            <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
-              Stage 3: Generate actionable buy/sell recommendations based on comprehensive AI analysis
-            </p>
-            <div className="inline-flex items-center gap-2 bg-green-500 text-green-900 px-4 py-2 rounded-full font-semibold">
-              <Briefcase size={20} />
-              Coming Soon
-            </div>
+      <div className="bg-white/60 backdrop-blur border-b">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center gap-3">
+            <BrainCircuit className="text-green-600" size={24} />
+            <h1 className="text-2xl font-bold">Investment Strategy</h1>
           </div>
+          <p className="text-sm text-slate-600 mt-2">Combine document sentiment, news, and forecasts to recommend Buy/Sell/Hold.</p>
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-12">
-        {/* Features Preview */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="text-blue-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Investment Decision-Making</h3>
-              <p className="text-gray-600">
-                Based on predictions, recommend whether to Buy, Sell, or Hold a stock with confidence scores.
-              </p>
+      <div className="container mx-auto px-6 py-8">
+        <form onSubmit={run} className="card mb-6">
+          <div className="card-body grid md:grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Document ID</label>
+              <input className="form-input" placeholder="e.g. 3M_2015_10K.pdf" value={docId} onChange={(e)=>setDocId(e.target.value)} />
+              <div className="text-xs text-slate-500 mt-1">Use an ID from the Dashboard list.</div>
+            </div>
+            <div>
+              <label className="form-label">Ticker (optional)</label>
+              <input className="form-input" placeholder="e.g. MMM" value={ticker} onChange={(e)=>setTicker(e.target.value)} />
+              <div className="text-xs text-slate-500 mt-1">If omitted, backend will try to infer.</div>
+            </div>
+            <div className="flex items-end">
+              <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+                {loading ? <Loader2 className="animate-spin" size={16} /> : 'Get Recommendation'}
+              </button>
             </div>
           </div>
+        </form>
 
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="text-green-600" size={32} />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Strategic Decision Support</h3>
-              <p className="text-gray-600">
-                Use financial data, market sentiment, and forecasts to build clear investment recommendations.
-              </p>
-            </div>
-          </div>
+        {error && <div className="alert alert-danger mb-6">{error}</div>}
 
-          <div className="card">
-            <div className="card-body text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <DollarSign className="text-purple-600" size={32} />
+        {rec && (
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 card">
+              <div className="card-header flex items-center gap-2">
+                <Target size={18} className="text-green-600" />
+                <h3 className="font-semibold">Recommendation</h3>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Portfolio Optimization</h3>
-              <p className="text-gray-600">
-                Generate optimal portfolio allocations based on risk tolerance and investment goals.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Investment Decision Matrix */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-3xl font-bold text-center mb-8">Investment Decision Framework</h2>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="text-green-600" size={32} />
-              </div>
-              <h4 className="font-semibold text-lg mb-2 text-green-700">BUY</h4>
-              <p className="text-sm text-gray-600">
-                Strong fundamentals, positive forecast, undervalued metrics
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="text-yellow-600" size={32} />
-              </div>
-              <h4 className="font-semibold text-lg mb-2 text-yellow-700">HOLD</h4>
-              <p className="text-sm text-gray-600">
-                Stable performance, fair valuation, neutral outlook
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="text-red-600" size={32} />
-              </div>
-              <h4 className="font-semibold text-lg mb-2 text-red-700">SELL</h4>
-              <p className="text-sm text-gray-600">
-                Weak fundamentals, negative forecast, overvalued
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Planned Features */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          <h2 className="text-3xl font-bold text-center mb-8">Planned Features</h2>
-          
-          <div className="space-y-6">
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-green-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Multi-Factor Analysis</h4>
-                <p className="text-gray-600">
-                  Combine financial metrics, market sentiment, technical indicators, and macroeconomic factors.
-                </p>
+              <div className="card-body">
+                <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${rec.action === 'BUY' ? 'bg-green-100 text-green-700' : rec.action === 'SELL' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>{rec.action}</span>
+                  <span className="text-sm text-slate-600">Confidence: {(rec.confidence * 100).toFixed(0)}%</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${rec.risk_level === 'HIGH' ? 'bg-red-100 text-red-700' : rec.risk_level === 'LOW' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>Risk: {rec.risk_level}</span>
+                </div>
+                {rec.target_price && (
+                  <div className="mt-3 inline-flex items-center gap-2 text-slate-700">
+                    <TrendingUp size={16} /> Target price: ${rec.target_price.toFixed(2)}
+                  </div>
+                )}
+                <div className="mt-4 whitespace-pre-line text-slate-800 text-sm">{rec.reasoning}</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-green-600" size={16} />
+            <div className="card">
+              <div className="card-header flex items-center gap-2">
+                <Shield size={18} />
+                <h3 className="font-semibold">Details</h3>
               </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Risk-Adjusted Recommendations</h4>
-                <p className="text-gray-600">
-                  Calculate Sharpe ratios, beta coefficients, and risk-adjusted returns for each recommendation.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-green-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Portfolio Construction</h4>
-                <p className="text-gray-600">
-                  Build diversified portfolios with optimal asset allocation based on modern portfolio theory.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-green-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Backtesting & Performance</h4>
-                <p className="text-gray-600">
-                  Test investment strategies against historical data and track recommendation performance.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-green-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Real-Time Decision Support</h4>
-                <p className="text-gray-600">
-                  Provide live investment alerts and recommendations based on market changes and news events.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                <ArrowRight className="text-green-600" size={16} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">ESG Integration</h4>
-                <p className="text-gray-600">
-                  Incorporate Environmental, Social, and Governance factors into investment decisions.
-                </p>
+              <div className="card-body text-sm text-slate-700 space-y-1">
+                <div>Document score: {((rec as any).components?.doc_score ?? 0).toFixed(2)}</div>
+                {typeof (rec as any).components?.news_score === 'number' && (
+                  <div>News score: {((rec as any).components?.news_score ?? 0).toFixed(2)}</div>
+                )}
+                {typeof (rec as any).components?.forecast_score === 'number' && (
+                  <div>Forecast score: {((rec as any).components?.forecast_score ?? 0).toFixed(2)}</div>
+                )}
+                {((rec as any).components?.forecast?.ticker) && (
+                  <div className="text-xs text-slate-500">Ticker: {(rec as any).components?.forecast?.ticker}</div>
+                )}
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Value Proposition */}
-        <div className="text-center mt-12">
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-8 border border-green-200">
-            <h3 className="text-2xl font-bold mb-4">Complete Investment Workflow</h3>
-            <p className="text-gray-600 mb-6 max-w-3xl mx-auto">
-              Stage 3 will combine insights from document analysis (Stage 1) and financial forecasting (Stage 2) 
-              to deliver comprehensive investment recommendations with clear reasoning and risk assessment.
-            </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-              <div className="flex items-center gap-2 text-blue-600 font-semibold">
-                <Target size={20} />
-                Data-Driven Decisions
-              </div>
-              <div className="flex items-center gap-2 text-green-600 font-semibold">
-                <Shield size={20} />
-                Risk Management
-              </div>
-              <div className="flex items-center gap-2 text-purple-600 font-semibold">
-                <DollarSign size={20} />
-                Optimized Returns
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

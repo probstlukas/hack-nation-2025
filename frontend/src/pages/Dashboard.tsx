@@ -130,14 +130,6 @@ const Dashboard: React.FC = () => {
             <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
               AI-powered financial document analysis and investment strategy platform
             </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-              <div className="text-sm text-blue-100">
-                Sponsored by <span className="font-semibold text-white">AkashX.ai</span>
-              </div>
-              <div className="text-sm text-blue-100">
-                HackNation 2025 Challenge
-              </div>
-            </div>
           </div>
         </div>
       </div>

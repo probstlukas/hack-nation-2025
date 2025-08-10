@@ -7,33 +7,43 @@ An AI-powered platform for financial document analysis and investment strategy d
 
 ## 🎯 Challenge Overview
 
-This project implements a comprehensive 3-stage AI system for financial analysis:
+This project implements a comprehensive 3-stage AI system for financial analysis, directly mapped to the AkashX.ai FinDocGPT challenge:
 
 ### Stage 1: Insights & Analysis (Document Q&A) ✅
-- Status: IMPLEMENTED
-- Process financial documents and extract key insights
-- Natural language Q&A interface for document analysis
+- Process financial documents from *FinanceBench* dataset
+- Natural language Q&A interface with RAG for document analysis
 - Sentiment analysis for overall and key sections
 
 ### Stage 2: Financial Forecasting ✅
-- Status: IMPLEMENTED (baseline + Prophet/LSTM optional)
-- Predict near‑term price movements using historical data
-- Model options: RandomForest (default), Prophet, LSTM
-- Interactive chart with zoom and overlays
+- Predict near‑term price movements using historical data from *yfinance*
+- Interactive chart with time window selection, error metric, and forecast vs. history
 
 ### Stage 3: Investment Strategy & Decision-Making ✅
-- Status: IMPLEMENTED (initial)
 - Generate actionable Buy/Sell/Hold with confidence and risk
-- Combines document sentiment, optional news sentiment, and forecast
-- UI live at /investment-strategy
+- Combines document sentiment, recent news sentiment, and forecast signal
+- Returns transparency details: used documents, per-doc breakdown, component scores
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│ React Frontend  │    │ FastAPI Backend  │    │  FinanceBench   │
-│ (TypeScript)    │◄──►│  (Python)        │◄──►│  Dataset (PDFs) │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+             ┌───────────────────────────┐
+             │       React Frontend      │
+             │         (TypeScript)      │
+             └───────────────────────────┘
+                           ▲
+                           │  REST/JSON
+                           │
+             ┌───────────────────────────┐
+             │       FastAPI Backend     │
+             │           (Python)        │
+             └───────────────────────────┘
+              ▲                          ▲
+              │ Ingest PDFs              │ Market Data
+              │                          │
+┌───────────────────────────┐   ┌───────────────────────────┐
+│       FinanceBench        │   │          yfinance         │
+│       Dataset (PDFs)      │   │      (Yahoo Finance)      │
+└───────────────────────────┘   └───────────────────────────┘
 ```
 
 ## 🚀 Quick Start
@@ -43,52 +53,54 @@ This project implements a comprehensive 3-stage AI system for financial analysis
 - Node.js 18+
 
 ### 1) Start Backend
-- Create a `.env` in repo root (or export in shell):
-  - NEWS_API_KEY=your_key
-  - PORT=5001 (optional)
-- Run server:
 
-```bash
-./start.sh
-```
+1. **Set up environment variables**  
+   - Copy the example file and edit it with your own values:
+     ```bash
+     cp .env.example .env
+     ```
+   - Open `.env` and set your keys:
+     - `NEWS_API_KEY` → Enables news sentiment analysis. Get from [newsapi.org](https://newsapi.org/).  
+     - `OPENAI_API_KEY` →  Get from [platform.openai.com](https://platform.openai.com/).  
+     - `PORT` → *(optional)* Server port (default: `5001`).  
 
-Backend runs at http://localhost:5001 (FastAPI docs at /docs).
+2. Create a conda environment (optional)
+    ```
+    conda create -n hack-nation python=3.10
+    ```
 
-### 2) Start Frontend
-- Optional `frontend/.env`:
-  - REACT_APP_API_URL=http://localhost:5001
-- From frontend/:
+3. **Run the start script**
+   This automatically activates the conda env, installs all dependencies and starts frontend/backend server.
+   ```bash
+   ./start.sh
 
-```bash
-npm install
-npm start
-```
-
+Backend runs at http://localhost:5001 (FastAPI docs at `/docs`).
 App runs at http://localhost:3000.
 
 ## 📚 Key Routes
-- /              Dashboard
-- /document/:id  Document Analysis (Q&A, PDF, Sentiment)
-- /forecasting   Forecasting (RF/Prophet/LSTM)
-- /investment-strategy  Investment Strategy (Stage 3 UI)
+- `/` — Dashboard
+- `/document/:id` — Document Analysis (Q&A, PDF, Sentiment)
+- `/forecasting` — Forecasting (RF/Prophet/LSTM)
+- `/investment-strategy` — Investment Strategy (Stage 3)
 
 ## 🧠 APIs (selected)
-- GET /api/documents
-- GET /api/documents/{id}
-- GET /api/documents/{id}/text
-- GET /api/documents/{id}/sentiment
-- GET /api/companies/{company}/news-sentiment
-- POST /api/forecast?ticker=...&period=...&horizon=...&model=...
-- POST /api/investment-recommendation
+- `GET /api/documents` — List available documents (FinanceBench)
+- `GET /api/documents/{id}` — Document metadata
+- `GET /api/documents/{id}/text` — Extracted document text
+- `GET /api/documents/{id}/sentiment` — TextBlob sentiment for document
+- `GET /api/documents/{id}/pdf` — Serve the PDF inline
+- `GET /api/companies/{company}/news-sentiment` — Aggregated recent news sentiment (requires NEWS_API_KEY)
+- `POST /api/forecast` — Body: `{ ticker, period, horizon, model }` → forecasts + MAE
+- `POST /api/investment-recommendation` — Body: `{ company|ticker, document_ids? }` → action/confidence/risk + transparency
+- `GET /api/lookup?q=` — Resolve ticker/company candidates (for UX)
 
 ## Notes
-- News sentiment requires NEWS_API_KEY set; otherwise that part is skipped.
-- Prophet/LSTM paths are optional and may take longer on first use.
-- PDFs are served inline via /api/documents/:id/pdf.
+- News sentiment requires `NEWS_API_KEY`; otherwise that component is omitted gracefully.
+- PDFs are served inline via `/api/documents/:id/pdf`.
 
 ## 📊 Dataset
 
-The project uses the **FinanceBench** dataset containing:
+The project uses the bundled **FinanceBench** dataset containing:
 
 - **300+ Financial Documents**: 10-K, 10-Q, 8-K filings, earnings reports
 - **Major Companies**: Apple, Microsoft, Amazon, Google, Tesla, and more
@@ -105,28 +117,23 @@ The project uses the **FinanceBench** dataset containing:
 
 ## 🛠️ Features
 
-### Current Features (Stage 1)
-- ✅ **Document Library**: Browse 300+ financial documents
-- ✅ **Smart Search**: Filter by company, sector, document type
-- ✅ **Document Viewer**: Read full document text
-- ✅ **Q&A Chat Interface**: Ask questions about any document
-- ✅ **Financial Metrics Extraction**: Automatic revenue, profit analysis
-- ✅ **Sentiment Analysis**: Market sentiment from financial text
-- ✅ **Responsive Design**: Works on desktop and mobile
+### Stage 1 — Document Q&A
+- **Document Library**: Browse 300+ financial documents
+- **Smart Search**: Filter by company, sector, document type
+- **Document Viewer**: Read full document text
+- **Q&A Chat Interface**: Ask questions about any document
+- **Financial Metrics Extraction**: Automatic revenue, profit analysis via Q&A
+- **Sentiment Analysis**: Market sentiment from financial text
+- **Responsive Design**: Works on desktop and mobile
 
-### Planned Features
+### Stage 2 — Forecasting
+- Historical price ingestion and model selection (LSTM/RF/Prophet)
+- MAE surfaced in UI; interactive brush/zoom; dashed forecast line; directional coloring
 
-#### Stage 2: Financial Forecasting
-- 🔄 Time series forecasting models
-- 🔄 External data integration (Yahoo Finance, Alpha Vantage)
-- 🔄 Risk assessment and volatility prediction
-- 🔄 Interactive forecasting dashboard
-
-#### Stage 3: Investment Strategy
-- 🔄 Buy/Sell/Hold recommendations
-- 🔄 Portfolio optimization
-- 🔄 Risk-adjusted returns calculation
-- 🔄 Backtesting capabilities
+### Stage 3 — Investment Strategy
+- Synthesizes document sentiment, news sentiment, and forecast
+- Returns action (BUY/SELL/HOLD), confidence, risk level, target price (when applicable)
+- Transparency: `used_documents` and `doc_breakdown` to show which docs influenced the decision
 
 ## 🔧 Technical Stack
 
@@ -143,33 +150,28 @@ The project uses the **FinanceBench** dataset containing:
 - **PyMuPDF** for PDF text extraction
 - **LangChain** for document processing
 - **NLTK** for sentiment analysis
-- **Pandas** for data analysis
 
 ### Key Libraries
 - `pymupdf`: PDF text extraction
 - `langchain`: Document chunking and processing
 - `nltk`: Natural language processing
-- `pandas`: Financial data analysis
 - `pdfplumber`: Enhanced PDF table extraction
 
 ## 📁 Project Structure
 
 ```
 hack-nation-2025/
-├── app.py                 # FastAPI backend
-├── requirements.txt       # Python dependencies
-├── util/
-│   └── pdf2text.py       # PDF processing utilities
+├── backend/
+│   ├── main.py               # FastAPI app entry
+│   └── util/                 # PDF, retrieval, sentiment, forecast utils
 ├── datasets/
-│   └── financebench/     # Financial documents and metadata
-├── frontend/             # React TypeScript frontend
-│   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── pages/        # Main application pages
-│   │   ├── services/     # API service layer
-│   │   ├── types/        # TypeScript type definitions
-│   │   └── utils/        # Utility functions
+│   └── financebench/         # Document metadata and PDFs
+├── frontend/                 # React + TypeScript app
+│   ├── src/pages/            # Pages: Dashboard, DocumentAnalysis, Forecasting, InvestmentStrategy
+│   ├── src/services/api.ts   # API client
 │   └── public/
+├── requirements.txt          # Python deps
+├── start.sh                  # Dev helper to launch backend
 └── README.md
 ```
 
@@ -188,12 +190,12 @@ hack-nation-2025/
 - **Confidence Scores**: AI confidence in responses
 - **Quick Questions**: Pre-built common questions
 
-### Stage Placeholders
-- **Professional Design**: Consistent with main application
-- **Feature Previews**: Detailed upcoming functionality
-- **Technical Roadmap**: Clear development timeline
+### Demo Guide
+1) Document Analysis: Open `/document/:id` from Dashboard; ask questions; view sentiment and PDF side-by-side.
+2) Forecasting: Open `/forecasting`; enter ticker (e.g., AAPL), choose model and horizon; run forecast; inspect MAE and overlay.
+3) Investment Strategy: Open `/investment-strategy`; enter ticker/company (e.g., Apple or AAPL); review action, confidence, risk; see which documents were used and the sentiment-over-time chart.
 
-## 🧪 Testing the Q&A System
+## 🧪 Try These Prompts
 
 Try these sample questions:
 
@@ -214,43 +216,34 @@ Try these sample questions:
 
 ## 🔮 Future Enhancements
 
-### Stage 2: Advanced Forecasting
-- **Machine Learning Models**: LSTM, ARIMA for time series
-- **External APIs**: Real-time market data integration
-- **Risk Modeling**: VaR, Monte Carlo simulations
-- **Visualization**: Interactive charts and forecasts
+### Stage 1: Financial Document Analysis and Q&A
+- **Improved Metric Extraction**: Use pattern matching (reports are structured), prompt engineering or a combination of both
 
-### Stage 3: Investment Intelligence
+### Stage 2: Advanced Forecasting
+- **Machine Learning Models**: Use more sophisticated models and include financial metrics from the reports as features
+- **Risk Modeling**: VaR, Monte Carlo simulations
+- **Uncertainty Estimates on Forecasting**: Use an ensemble of different prediction models and model accuracy from historical data
+
+### Stage 3: Investment Strategy
 - **Portfolio Theory**: Modern portfolio optimization
 - **ESG Integration**: Environmental, Social, Governance factors
 - **Backtesting**: Historical strategy performance
 - **Real-time Alerts**: Market change notifications
 
 ## 📝 API Documentation
+See “APIs (selected)” above and live docs at `http://localhost:5001/docs`.
 
-### Document Endpoints
-- `GET /api/documents` - List all available documents
-- `GET /api/documents/{id}` - Get document details
-- `GET /api/documents/{id}/text` - Get document text content
-- `GET /api/documents/{id}/sentiment` - Get sentiment analysis
 
-### Q&A Endpoints
-- `POST /api/qa` - Ask a question about a document
+## Authors
+- Lukas Probst
+- Christopher von Klitzing
 
-### Stage 2 & 3 Placeholders
-- `POST /api/forecast` - Financial forecasting (placeholder)
-- `POST /api/investment-recommendation` - Investment advice (placeholder)
-
-## 🤝 Contributing
-
-This project was built for the AkashX.ai challenge at HackNation 2025. The current implementation focuses on Stage 1 (Document Q&A) with a solid foundation for Stage 2 and 3 development.
 
 ## 📄 License
-
 This project is developed for the AkashX.ai HackNation 2025 challenge.
 
 ---
 
 **Sponsored by AkashX.ai** | **HackNation 2025 Challenge**
 
-*Building the future of AI-powered financial analysis*
+— Building the future of AI-powered financial analysis —

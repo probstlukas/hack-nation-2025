@@ -9,7 +9,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .pdf2text import chunk_documents
-from .answer_question import answer_question_openai
+from .answer_question import answer_question_openai, general_promot_no_context
 
 
 @dataclass
@@ -53,6 +53,9 @@ def retrieve(
     return [(chunks[i], meta[i], float(sims[i])) for i in idxs]
 
 
+ANSWER_HISTORY: Dict[str, List[str]] = {}
+
+
 def answer_question(doc_id: str, question: str, top_k: int = 4) -> Dict[str, Any]:
     """Simple extractive QA: returns top snippets as the answer with scores.
 
@@ -84,13 +87,34 @@ def answer_question(doc_id: str, question: str, top_k: int = 4) -> Dict[str, Any
     confidence = 0.6 + 0.35 * max(0.0, min(1.0, avg_score))
     """
 
+    if doc_id not in ANSWER_HISTORY:
+        ANSWER_HISTORY[doc_id] = []
+
     doc_index = {
         name.lower(): name for name in os.listdir("datasets/financebench/pdfs")
     }
     doc_name = doc_index[doc_id.lower() + ".pdf"]
     doc_path = os.path.join("datasets", "financebench", "pdfs", doc_name)
     print("Before answer question")
-    answer = answer_question_openai(question, doc_path, top_k)
+
+    for i in range(5):
+        history_list = ANSWER_HISTORY[doc_id]
+        if len(history_list) == 0:
+            history = None
+        else:
+            history = "\n".join(history_list)
+        answer = answer_question_openai(
+            question, doc_path, top_k + i, extra_contex=history
+        )
+
+        prompt = f"Does it seem like the answer '{answer}' makes sense for the question '{question}'? Please just answer with 'yes' or 'no'"
+        checker_answer = general_promot_no_context(prompt).lower()
+        if "yes" in checker_answer:
+            ANSWER_HISTORY[doc_id].append(f"{answer}")
+            break
+        else:
+            continue
+
     print("after answer question")
     print(answer)
     sources = []

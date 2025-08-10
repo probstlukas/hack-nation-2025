@@ -180,7 +180,7 @@ const DocumentAnalysis: React.FC = () => {
       
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-6 py-4">
+        <div className="w-full max-w-screen-2xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
@@ -203,7 +203,7 @@ const DocumentAnalysis: React.FC = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8 flex-1 flex flex-col min-h-0">
+      <div className="w-full max-w-screen-2xl mx-auto px-6 py-8 flex-1 flex flex-col min-h-0">
         {/* Tab Navigation (consistent styling) */}
         <div className="bg-white rounded-t-xl shadow-sm border border-gray-200 border-b-0 w-full block">
           <div className="tabs">
@@ -380,118 +380,111 @@ const DocumentAnalysis: React.FC = () => {
 
           {/* PDF View Tab */}
           {activeTab === 'document' && (
-            <div className="p-8">
-              <div className="card full-height-card flex flex-col overflow-hidden">
-                {document ? (
-                  <PDFViewer
-                    pdfUrl={`http://localhost:5001/api/documents/${document.id}/pdf`}
-                    documentName={document.name}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <FileText size={48} className="text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">Loading PDF document...</p>
+            <div className="p-8 grid lg:grid-cols-4 gap-8 flex-1 min-h-0">
+              <div className="flex-1 min-h-0 lg:col-span-4">
+                <div className="card full-height-card flex flex-col overflow-hidden w-full">
+                  {document ? (
+                    <PDFViewer
+                      pdfUrl={`http://localhost:5001/api/documents/${document.id}/pdf`}
+                      documentName={document.name}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <FileText size={48} className="text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-500">Loading PDF document...</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {/* Sentiment Analysis Tab */}
           {activeTab === 'sentiment' && (
-            <div className="p-8">
-              {sentimentLoading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="animate-spin" size={24} />
-                    <span className="text-lg">Analyzing document sentiment...</span>
-                  </div>
-                </div>
-              ) : sentimentData && sentimentData.overall ? (
-                <div className="space-y-6">
-                  {/* Overall Sentiment */}
-                  <div className="card">
-                    <div className="card-header">
-                      <h3 className="text-xl font-semibold">Overall Document Sentiment</h3>
-                    </div>
-                    <div className="card-body">
-                      <div className="grid md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-green-50 rounded-lg">
-                          <div className="text-2xl font-bold text-green-600">
-                            {((sentimentData.overall?.positive ?? 0) * 100).toFixed(1)}%
-                          </div>
-                          <div className="text-sm text-green-700 font-medium">Positive</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold text-gray-600">
-                            {((sentimentData.overall?.neutral ?? 0) * 100).toFixed(1)}%
-                          </div>
-                          <div className="text-sm text-gray-700 font-medium">Neutral</div>
-                        </div>
-                        <div className="text-center p-4 bg-red-50 rounded-lg">
-                          <div className="text-2xl font-bold text-red-600">
-                            {((sentimentData.overall?.negative ?? 0) * 100).toFixed(1)}%
-                          </div>
-                          <div className="text-sm text-red-700 font-medium">Negative</div>
-                        </div>
-                      </div>
+            <div className="p-8 flex-1 flex flex-col min-h-0">
+              <div className="flex-1 min-h-0 w-full">
+                {sentimentLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="animate-spin" size={24} />
+                      <span className="text-lg">Analyzing document sentiment...</span>
                     </div>
                   </div>
-
-                  {/* Section Sentiment */}
-                  {sentimentData.sections && Object.keys(sentimentData.sections).length > 0 && (
+                ) : sentimentData && sentimentData.overall ? (
+                  <div className="space-y-6 w-full">
+                    {/* Overall Sentiment */}
                     <div className="card">
                       <div className="card-header">
-                        <h3 className="text-xl font-semibold">Section-wise Sentiment Analysis</h3>
+                        <h3 className="text-xl font-semibold">Overall Document Sentiment</h3>
                       </div>
                       <div className="card-body">
-                        <div className="space-y-4">
-                          {Object.entries(sentimentData.sections).map(([sectionName, sentiment], index) => (
-                            <div key={index} className="border border-gray-200 rounded-lg p-4">
-                              <h4 className="font-medium text-gray-900 mb-3">{sectionName}</h4>
-                              <div className="grid grid-cols-3 gap-3 text-sm">
-                                <div className="text-center">
-                                  <div className="font-semibold text-green-600">
-                                    {(((sentiment?.positive ?? 0) as number) * 100).toFixed(1)}%
-                                  </div>
-                                  <div className="text-gray-600">Positive</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="font-semibold text-gray-600">
-                                    {(((sentiment?.neutral ?? 0) as number) * 100).toFixed(1)}%
-                                  </div>
-                                  <div className="text-gray-600">Neutral</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="font-semibold text-red-600">
-                                    {(((sentiment?.negative ?? 0) as number) * 100).toFixed(1)}%
-                                  </div>
-                                  <div className="text-gray-600">Negative</div>
-                                </div>
-                              </div>
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div className="text-center p-4 bg-green-50 rounded-lg">
+                            <div className="text-2xl font-bold text-green-600">
+                              {((sentimentData.overall?.positive ?? 0) * 100).toFixed(1)}%
                             </div>
-                          ))}
+                            <div className="text-sm text-green-700 font-medium">Positive</div>
+                          </div>
+                          <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <div className="text-2xl font-bold text-gray-600">
+                              {((sentimentData.overall?.neutral ?? 0) * 100).toFixed(1)}%
+                            </div>
+                            <div className="text-sm text-gray-700 font-medium">Neutral</div>
+                          </div>
+                          <div className="text-center p-4 bg-red-50 rounded-lg">
+                            <div className="text-2xl font-bold text-red-600">
+                              {((sentimentData.overall?.negative ?? 0) * 100).toFixed(1)}%
+                            </div>
+                            <div className="text-sm text-red-700 font-medium">Negative</div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center">
-                    <TrendingUp size={48} className="text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-4">No sentiment data available</p>
-                    <button 
-                      onClick={loadSentimentData}
-                      className="btn btn-primary hover-lift"
-                    >
-                      Load Sentiment Analysis
-                    </button>
+
+                    {/* Section Sentiment */}
+                    {sentimentData.sections && Object.keys(sentimentData.sections).length > 0 && (
+                      <div className="card">
+                        <div className="card-header">
+                          <h3 className="text-xl font-semibold">Section-wise Sentiment Analysis</h3>
+                        </div>
+                        <div className="card-body">
+                          <div className="space-y-4">
+                            {Object.entries(sentimentData.sections).map(([sectionName, sentiment], index) => (
+                              <div key={index} className="border border-gray-200 rounded-lg p-4">
+                                <h4 className="font-medium text-gray-900 mb-3">{sectionName}</h4>
+                                <div className="grid grid-cols-3 gap-3 text-sm">
+                                  <div className="text-center">
+                                    <div className="font-semibold text-green-600">
+                                      {(((sentiment?.positive ?? 0) as number) * 100).toFixed(1)}%
+                                    </div>
+                                    <div className="text-gray-600">Positive</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="font-semibold text-gray-600">
+                                      {(((sentiment?.neutral ?? 0) as number) * 100).toFixed(1)}%
+                                    </div>
+                                    <div className="text-gray-600">Neutral</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="font-semibold text-red-600">
+                                      {(((sentiment?.negative ?? 0) as number) * 100).toFixed(1)}%
+                                    </div>
+                                    <div className="text-gray-600">Negative</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-gray-500">No sentiment data available.</div>
+                )}
+              </div>
             </div>
           )}
         </div>

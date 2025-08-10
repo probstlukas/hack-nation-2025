@@ -423,6 +423,13 @@ textarea.form-input {
 
 /* Utilities */
 .container { max-width: 1320px; margin: 0 auto; padding: 0 1rem; }
+.container-wide { max-width: 1600px; }
+/* New: fluid container takes full width */
+.container-fluid { max-width: 100%; }
+
+/* Wider container for pages that need more horizontal space */
+.container-wide { max-width: 1600px; }
+
 .grid { display: grid; }
 .flex { display: flex; }
 .items-center { align-items: center; }
@@ -863,3 +870,32 @@ textarea.form-input {
 .border-blue-200 { border-color: #bfdbfe; }
 .text-blue-900 { color: #1e3a8a; }
 /* --- End sentiment color utilities --- */
+
+/* Company logo: consistent size and appearance */
+.company-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #f8fafc; /* slate-50 */
+  border: 1px solid #e5e7eb; /* gray-200 */
+  padding: 2px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Document cards: subtle elevation and hover beautification */
+.doc-card {
+  border: 1px solid #eef2f7;
+  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+}
+.doc-card:hover {
+  border-color: #dbe3ee;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+}
+
+/* Library panel beautification */
+.library-panel {
+  background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+  border: 1px solid #eef2f7;
+  box-shadow: 0 6px 20px rgba(16, 24, 40, 0.06);
+}

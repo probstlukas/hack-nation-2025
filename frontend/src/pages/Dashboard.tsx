@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Document } from '../types';
 import { apiService } from '../services/api';
+import { getCompanyLogoUrl } from '../utils/companyLogos';
 
 const Dashboard: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -193,7 +194,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Document Library */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="bg-white rounded-xl shadow-lg p-6 library-panel">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Financial Document Library</h2>
             <div className="text-sm text-gray-500">
@@ -284,12 +285,22 @@ const Dashboard: React.FC = () => {
               <Link
                 key={doc.id}
                 to={`/document/${doc.id}`}
-                className="card hover:shadow-lg transition-all duration-200 group"
+                className="card doc-card hover:shadow-lg transition-all duration-200 group"
               >
                 <div className="card-body">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Building2 size={16} className="text-gray-500" />
+                      {/* Company Logo */}
+                      <img
+                        src={getCompanyLogoUrl(doc.company)}
+                        alt={`${doc.company} logo`}
+                        className="company-logo"
+                        width={28}
+                        height={28}
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      />
                       <span className="font-semibold text-gray-900">{doc.company}</span>
                     </div>
                     <ChevronRight 

@@ -253,7 +253,7 @@ def run_forecast(ticker: str, period: str = "5y", horizon: int = 5, model: str =
     horizon_days=horizon,
     last_price=float(prices["close"].iloc[-1]),
     predictions=preds_df if preds_df is not None else pd.DataFrame(columns=["date", "pred"]),
-    history=prices.tail(252*2).copy(),  # last ~2 years for context
+    history=prices.copy(),  # return full history for the selected period
   )
 
 

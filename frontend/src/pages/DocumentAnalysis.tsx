@@ -253,7 +253,7 @@ const DocumentAnalysis: React.FC = () => {
                         <button
                           key={index}
                           onClick={() => handleQuickQuestion(question)}
-                          className="group w-full text-left btn btn-outline hover-lift"
+                          className="w-full btn btn-outline hover-lift"
                           disabled={questionLoading}
                         >
                           <div className="flex items-start justify-between gap-3">

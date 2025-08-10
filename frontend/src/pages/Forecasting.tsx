@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, ExternalLink } from 'lucide-react';
+import { TrendingUp, Search, LineChart as LineChartIcon, Loader2, Newspaper, ExternalLink, FileText } from 'lucide-react';
 import { apiService } from '../services/api';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, ReferenceLine, Legend, Brush, AreaChart, Area } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid, ReferenceLine, Legend, Brush, AreaChart, Area, BarChart, Bar, Cell } from 'recharts';
+import { Document as FinDoc, SentimentAnalysis } from '../types';
 
 const periods = [
   { label: '1y', value: '1y' },
@@ -28,6 +29,11 @@ const Forecasting: React.FC = () => {
   const [result, setResult] = useState<any | null>(null);
   const [news, setNews] = useState<any | null>(null);
   const [newsLoading, setNewsLoading] = useState(false);
+  const [allDocs, setAllDocs] = useState<FinDoc[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docSentiments, setDocSentiments] = useState<Array<{ date: string; sentiment: number; id: string; company: string; label?: string }>>([]);
+  const [docSentimentCache, setDocSentimentCache] = useState<Record<string, number>>({});
+  const [visibleRange, setVisibleRange] = useState<{ start: string; end: string } | null>(null);
 
   const runForecast = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -56,6 +62,23 @@ const Forecasting: React.FC = () => {
     }
   };
 
+  // Load documents once
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setDocsLoading(true);
+        const docs = await apiService.getDocuments();
+        if (mounted) setAllDocs(docs);
+      } catch (e) {
+        // no-op
+      } finally {
+        if (mounted) setDocsLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const combinedData = React.useMemo((): { hist: any[]; preds: any[]; lastDate: string | undefined; merged: any[] } => {
     if (!result) return { hist: [], preds: [], lastDate: undefined, merged: [] };
     const hist = (result.history || []).map((d: any) => ({ date: d.date, close: d.close }));
@@ -76,6 +99,156 @@ const Forecasting: React.FC = () => {
 
     return { hist, preds, lastDate, merged };
   }, [result]);
+
+  // Determine chart date range
+  const chartRange = React.useMemo(() => {
+    const merged = (combinedData && combinedData.merged) || [];
+    if (!merged.length) return null;
+    const start = new Date(merged[0].date);
+    const end = new Date(merged[merged.length - 1].date);
+    return { start, end };
+  }, [combinedData]);
+
+  // Map ticker to possible company names
+  const mapTickerToCandidates = React.useCallback((t: string): string[] => {
+    const T = (t || '').toUpperCase();
+    const m: Record<string, string[]> = {
+      AAPL: ['Apple'],
+      NVDA: ['NVIDIA'],
+      MSFT: ['Microsoft'],
+      AMZN: ['Amazon'],
+      META: ['Meta', 'Facebook'],
+      TSLA: ['Tesla'],
+      GOOGL: ['Alphabet', 'Google'],
+      GOOG: ['Alphabet', 'Google'],
+      MMM: ['3M'],
+      ADBE: ['Adobe'],
+      AES: ['AES'],
+      ATVI: ['Activision', 'Activision Blizzard', 'ActivisionBlizzard'],
+    };
+    return m[T] ? m[T] : [T];
+  }, []);
+
+  // Helper to get an ISO date for a document period/year
+  const docToDate = React.useCallback((doc: FinDoc): string | null => {
+    const yAny = (doc.year as any);
+    const yearNum = typeof yAny === 'number' ? yAny : parseInt(String(yAny || ''), 10);
+    const p = String(doc.period || '');
+    if (!isNaN(yearNum)) {
+      const q = /Q([1-4])/i.exec(p || '');
+      if (q) {
+        const qn = parseInt(q[1], 10);
+        const monthDay = qn === 1 ? '03-31' : qn === 2 ? '06-30' : qn === 3 ? '09-30' : '12-31';
+        return `${yearNum}-${monthDay}`;
+      }
+      return `${yearNum}-12-31`;
+    }
+    // fallback: try to extract a 4-digit year from period
+    const yMatch = /(20\d{2}|19\d{2})/.exec(p);
+    if (yMatch) return `${yMatch[1]}-12-31`;
+    return null;
+  }, []);
+
+  // Build daily sentiment series from news.sentiment_trend for bar visualization
+  const sentimentSeries = React.useMemo(() => {
+    const trend = (news && Array.isArray(news.sentiment_trend)) ? news.sentiment_trend : [];
+    return trend.map((d: any) => ({
+      date: d.date,
+      sentiment: typeof d.sentiment === 'number' ? Math.max(-1, Math.min(1, d.sentiment)) : 0,
+      label: d.label,
+      count: d.article_count || d.count || 0,
+    }));
+  }, [news]);
+
+  // Compute and fetch document sentiments when forecast/news are available
+  React.useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!result || !chartRange || !allDocs.length) return;
+      const candidates = mapTickerToCandidates(result.ticker || ticker);
+      const start = chartRange.start.getTime();
+      const end = chartRange.end.getTime();
+      // Filter docs by company match and within chart range
+      const matched = allDocs.filter(d => {
+        const comp = (d.company || '').toLowerCase();
+        const hit = candidates.some(name => comp.includes(name.toLowerCase()));
+        if (!hit) return false;
+        const iso = docToDate(d);
+        if (!iso) return false;
+        const t = new Date(iso).getTime();
+        return t >= start && t <= end;
+      });
+
+      // Limit to avoid many requests
+      const limited = matched.slice(0, 12);
+
+      // Fetch sentiments (use cache when available)
+      const results: Array<{ date: string; sentiment: number; id: string; company: string; label?: string }> = [];
+      for (const doc of limited) {
+        const iso = docToDate(doc);
+        if (!iso) continue;
+        let sent = docSentimentCache[doc.id];
+        if (typeof sent !== 'number') {
+          try {
+            // Prefer enhanced endpoint; exclude news to keep doc-only sentiment
+            const enhanced = await apiService.getEnhancedDocumentSentiment(doc.id, false);
+            const docSent = (enhanced && (enhanced.document_sentiment || enhanced.sentiment || enhanced)) as any;
+            let compound: number | undefined = docSent?.overall?.compound;
+            if (typeof compound !== 'number') {
+              const pos = Number(docSent?.overall?.positive || 0);
+              const neg = Number(docSent?.overall?.negative || 0);
+              compound = pos - neg;
+            }
+            if (typeof compound === 'number') {
+              sent = Math.max(-1, Math.min(1, compound));
+              setDocSentimentCache(prev => ({ ...prev, [doc.id]: sent! }));
+            } else {
+              continue;
+            }
+          } catch {
+            try {
+              const basic = await apiService.getDocumentSentiment(doc.id);
+              const pos = Number(basic?.overall?.positive || 0);
+              const neg = Number(basic?.overall?.negative || 0);
+              sent = Math.max(-1, Math.min(1, pos - neg));
+              setDocSentimentCache(prev => ({ ...prev, [doc.id]: sent! }));
+            } catch {
+              continue;
+            }
+          }
+        }
+        results.push({ date: iso, sentiment: sent as number, id: doc.id, company: doc.company, label: doc.doc_type });
+        if (cancelled) break;
+      }
+      if (!cancelled) setDocSentiments(results.sort((a, b) => a.date.localeCompare(b.date)));
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [result, chartRange, allDocs, mapTickerToCandidates, docToDate, docSentimentCache, ticker]);
+
+  // Initialize/reset visible range when merged series changes
+  React.useEffect(() => {
+    const merged = (combinedData && combinedData.merged) || [];
+    if (merged.length) {
+      const start = merged[0].date;
+      const end = merged[merged.length - 1].date;
+      setVisibleRange({ start, end });
+    } else {
+      setVisibleRange(null);
+    }
+  }, [combinedData]);
+
+  const isInVisibleRange = React.useCallback((d: string) => {
+    if (!visibleRange) return true;
+    const t = new Date(d).getTime();
+    const s = new Date(visibleRange.start).getTime();
+    const e = new Date(visibleRange.end).getTime();
+    return t >= s && t <= e;
+  }, [visibleRange]);
+
+  // Filtered series for rendering under the chart
+  const filteredSentimentSeries = React.useMemo(() => (sentimentSeries || []).filter((d: any) => isInVisibleRange(d.date)), [sentimentSeries, isInVisibleRange]);
+  const filteredDocSentiments = React.useMemo(() => (docSentiments || []).filter((d: any) => isInVisibleRange(d.date)), [docSentiments, isInVisibleRange]);
 
   const overallNews = news?.overall_sentiment || { positive: 0, neutral: 0, negative: 0 };
   const posPct = Math.round((overallNews.positive || 0) * 100);
@@ -184,6 +357,17 @@ const Forecasting: React.FC = () => {
                         stroke="#cbd5e1"
                         fill="#f8fafc"
                         className="mt-2"
+                        onChange={(range: any) => {
+                          try {
+                            const startIdx = Math.max(0, Math.min(range?.startIndex ?? 0, combinedData.merged.length - 1));
+                            const endIdx = Math.max(0, Math.min(range?.endIndex ?? combinedData.merged.length - 1, combinedData.merged.length - 1));
+                            const start = combinedData.merged[startIdx]?.date;
+                            const end = combinedData.merged[endIdx]?.date;
+                            if (start && end) setVisibleRange({ start, end });
+                          } catch {
+                            // ignore
+                          }
+                        }}
                       >
                         <AreaChart data={combinedData.merged}>
                           <defs>
@@ -203,11 +387,65 @@ const Forecasting: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Daily news sentiment bars (filtered by Brush range) */}
+              {filteredSentimentSeries.length > 0 && (
+                <div className="px-4 pb-4">
+                  <div className="text-sm text-slate-600 mb-1 flex items-center gap-2">
+                    <Newspaper size={16} /> Daily news sentiment
+                  </div>
+                  <div style={{ height: 120 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={filteredSentimentSeries} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} />
+                        <RechartsTooltip formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Sentiment']} />
+                        <ReferenceLine y={0} stroke="#94a3b8" />
+                        <Bar dataKey="sentiment" radius={[4, 4, 0, 0]}>
+                          {filteredSentimentSeries.map((entry: any, index: number) => {
+                            const s = entry.sentiment as number;
+                            const color = s > 0.1 ? '#16a34a' : s < -0.1 ? '#dc2626' : '#64748b';
+                            return <Cell key={`cell-${index}`} fill={color} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Document sentiment bars (filtered by Brush range) */}
+              {filteredDocSentiments.length > 0 && (
+                <div className="px-4 pb-4">
+                  <div className="text-sm text-slate-600 mb-1 flex items-center gap-2">
+                    <FileText size={16} /> Document sentiment (FinanceBench)
+                  </div>
+                  <div style={{ height: 100 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={filteredDocSentiments} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <YAxis domain={[-1, 1]} tick={{ fontSize: 10 }} />
+                        <RechartsTooltip formatter={(v: any, _n: any, p: any) => [typeof v === 'number' ? v.toFixed(2) : v, p && p.payload ? `${p.payload.company} • ${p.payload.label || ''}` : 'Document']} />
+                        <ReferenceLine y={0} stroke="#94a3b8" />
+                        <Bar dataKey="sentiment" radius={[4, 4, 0, 0]}>
+                          {filteredDocSentiments.map((entry, index) => {
+                            const s = entry.sentiment as number;
+                            const color = s > 0.1 ? '#16a34a' : s < -0.1 ? '#dc2626' : '#64748b';
+                            return <Cell key={`doc-cell-${index}`} fill={color} />;
+                          })}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right: News Sentiment */}
-          <div className="lg:col-span-1">
+          {/* Recent News Sentiment: moved below and matched width to chart (col-span-3) */}
+          <div className="lg:col-span-3">
             <div className="card h-full">
               <div className="card-header flex items-center gap-2">
                 <Newspaper size={18} />
@@ -290,6 +528,8 @@ const Forecasting: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* remove previous right-column news panel */}
         </div>
       </div>
     </div>

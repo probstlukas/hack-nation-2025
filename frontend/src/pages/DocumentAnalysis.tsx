@@ -7,7 +7,8 @@ import {
   Send, 
   Loader2, 
   BarChart3,
-  TrendingUp 
+  TrendingUp,
+  ChevronRight
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { Document, SentimentAnalysis } from '../types';
@@ -252,10 +253,18 @@ const DocumentAnalysis: React.FC = () => {
                         <button
                           key={index}
                           onClick={() => handleQuickQuestion(question)}
-                          className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 text-sm hover-lift"
+                          className="w-full btn btn-outline hover-lift"
                           disabled={questionLoading}
                         >
-                          {question}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                                <MessageSquare size={16} />
+                              </div>
+                              <div className="text-slate-800 leading-relaxed">{question}</div>
+                            </div>
+                            <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+                          </div>
                         </button>
                       ))}
                     </div>

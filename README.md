@@ -2,8 +2,12 @@
 
 [![AkashX.ai](https://img.shields.io/badge/Sponsored%20by-AkashX.ai-blue)](https://akashx.ai)
 [![HackNation 2025](https://img.shields.io/badge/HackNation-2025-green)](https://hacknation.com)
+[![VC Track 2025](https://img.shields.io/badge/VC%20Track-2025-gold)](https://hacknation.com)
 
 An AI-powered platform for financial document analysis and investment strategy development, built for the AkashX.ai challenge at HackNation 2025.
+
+🏆 Selected as **one of 15 global teams** for the Hack-Nation **VC Track 2025**  
+(out of 2,800+ applications and 1,500 hackathon participants).
 
 ## 🎯 Challenge Overview
 
